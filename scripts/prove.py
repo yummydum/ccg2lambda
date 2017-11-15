@@ -41,7 +41,7 @@ def main(args = None):
     parser.add_argument("--graph_out", nargs='?', type=str, default="",
         help="HTML graphical output filename.")
     parser.add_argument("--abduction", nargs='?', type=str, default="no",
-        choices=["no", "naive", "spsa"],
+        choices=["no", "naive", "spsa", "phrase"],
         help="Activate on-demand axiom injection (default: no axiom injection).")
     parser.add_argument("--gold_trees", action="store_true", default=False)
     args = parser.parse_args()
@@ -60,6 +60,9 @@ def main(args = None):
     elif args.abduction == "naive":
         from abduction_naive import AxiomsWordnet
         abduction = AxiomsWordnet()
+    elif args.abduction == "phrase":
+        from abduction_phrase import AxiomsPhrase
+        abduction = AxiomsPhrase()
 
     parser = etree.XMLParser(remove_blank_text=True)
     doc = etree.parse(args.sem, parser)
