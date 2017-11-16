@@ -39,27 +39,30 @@ class AxiomsPhrase(object):
     def __init__(self):
         pass
 
-    def attempt(self, coq_scripts, context=None):
-        return TryPhraseAbduction(coq_scripts)
+    def attempt(self, coq_scripts, doc, target, context=None):
+        return TryPhraseAbduction(coq_scripts, target)
 
-def TryPhraseAbduction(coq_scripts):
+def TryPhraseAbduction(coq_scripts, target):
     assert len(coq_scripts) == 2
     direct_proof_script = coq_scripts[0]
     reverse_proof_script = coq_scripts[1]
     axioms = set()
-    while True:
-        #entailment proof
-        inference_result_str, direct_proof_scripts, new_direct_axioms = \
-            try_phrase_abduction(direct_proof_script,
-                          previous_axioms=axioms, expected='yes')
-        current_axioms = axioms.union(new_direct_axioms)
-        reverse_proof_scripts = []
-        #contradiction proof
-        if not inference_result_str == 'yes':
+    direct_proof_scripts, reverse_proof_scripts = [], []
+    inference_result_str, all_scripts = "", []
+    while inference_result_str == target:
+        #continue abduction for phrase acquisition until inference_result_str matches target
+        if target == 'yes':
+            #entailment proof
+            inference_result_str, direct_proof_scripts, new_direct_axioms = \
+                try_phrase_abduction(direct_proof_script,
+                              previous_axioms=axioms, expected='yes')
+            current_axioms = axioms.union(new_direct_axioms)
+        elif target == 'no':
+            #contradiction proof
             inference_result_str, reverse_proof_scripts, new_reverse_axioms = \
                 try_phrase_abduction(reverse_proof_script,
                               previous_axioms=current_axioms, expected='no')
-            current_axioms.update(new_reverse_axioms)
+            current_axioms = axioms.union(new_reverse_axioms)
         all_scripts = direct_proof_scripts + reverse_proof_scripts
         if len(axioms) == len(current_axioms) or inference_result_str != 'unknown':
             break
@@ -70,19 +73,19 @@ def TryPhraseAbduction(coq_scripts):
 def try_phrase_abduction(coq_script, previous_axioms=set(), expected='yes'):
     new_coq_script = insert_axioms_in_coq_script(previous_axioms, coq_script)
     current_tactics = get_tactics()
-    debug_tactics = 'repeat nltac_base. try substitution. Qed'
+    #debug_tactics = 'repeat nltac_base. try substitution. Qed'
+    debug_tactics = 'repeat nltac_base. Qed'
     coq_script_debug = new_coq_script.replace(current_tactics, debug_tactics)
     process = Popen(
         coq_script_debug,
         shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output_lines = [line.decode('utf-8').strip()
                     for line in process.stdout.readlines()]
-    if is_theorem_almost_defined(l.split() for l in output_lines):
+    if is_theorem_almost_defined(output_lines):
         return expected, [new_coq_script], previous_axioms
     premise_lines = get_premise_lines(output_lines)
     #for phrase extraction, check all relations between premise_lines and conclusions
     conclusion = get_conclusion_lines(output_lines)
-    #print("premise:{0}, conclusion:{1}".format(premise_lines, conclusion), file=sys.stderr)
     if not premise_lines or not conclusion:
         failure_log = {"type error": has_type_error(output_lines),
                        "open formula": has_open_formula(output_lines)}
@@ -95,9 +98,8 @@ def try_phrase_abduction(coq_script, previous_axioms=set(), expected='yes'):
     process = Popen(
         new_coq_script,
         shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    output_lines = [line.decode('utf-8').strip().split()
+    output_lines = [line.decode('utf-8').strip()
                     for line in process.stdout.readlines()]
-    #
     inference_result_str = expected if is_theorem_almost_defined(
         output_lines) else 'unknown'
     return inference_result_str, [new_coq_script], axioms
@@ -105,10 +107,10 @@ def try_phrase_abduction(coq_script, previous_axioms=set(), expected='yes'):
 def make_phrase_axioms_from_premises_and_conclusion(premises, conclusions, coq_output_lines=None, expected='yes'):
     axioms = set()
     for conclusion in conclusions:
-        matching_premises = get_premises_that_match_conclusion_args(premises, conclusion)
+        matching_premises = get_premises_that_partially_match_conclusion_args(premises, conclusion)
         premise_preds = [premise.split()[2] for premise in matching_premises]
         conclusion_pred = conclusion.split()[0]
-        pred_args = get_predicate_arguments(premises, conclusion)
+        pred_args = get_predicate_arguments(matching_premises, conclusion)
         axioms.update(make_phrase_axioms(premise_preds, conclusion_pred, pred_args, expected))
         #if not axioms:
         #    failure_log = make_failure_log(
@@ -154,6 +156,9 @@ def get_phrases(premise_preds, conclusion_pred, pred_args):
     axioms = []
     src_preds = [denormalize_token(p) for p in premise_preds]
     trg_pred = denormalize_token(conclusion_pred)
+    if "False" in trg_pred or "=" in trg_pred:
+        return list(set(axioms))
+    print("premise_pred:{0}, conclusion_pred:{1}, src_preds:{2}, trg_pred:{3}".format(premise_preds, conclusion_pred, src_preds, trg_pred), file=sys.stderr)
     #if len(src_preds) > 1:
     #    to do?: select best src_pred
     axiom = 'Axiom ax_phrase_{0}_{1} : forall x, _{0} x -> _{1} x.'\
@@ -186,8 +191,6 @@ def get_probability_phrases(premise_preds, conclusion_pred, pred_args):
         axioms.append(axiom)
     return list(set(axioms))
 
-#to do:
-#if "no" contains premise sentences, substitute "no" for "a" in the first proof step
 
 #for neutral(STS)
 #if the similarity score is in the range of the score(entailment/contradiction, [3-5]),
@@ -219,7 +222,34 @@ def calc_categorysim(sub_pred, prem_pred):
 def is_theorem_almost_defined(output_lines):
     #to do:check if all content subgoals are deleted(remaining relation subgoals is permitted)
     #ignore relaional subgoals(False, Acc x0=x1) in the proof
-    for output_line in output_lines:
-        if len(output_line) > 2 and 'is defined' in (' '.join(output_line[-2:])):
-            return True
-    return False
+    conclusion = get_conclusion_lines(output_lines)
+    print("conclusion:{0}".format(conclusion), file=sys.stderr)
+    if len(conclusion) > 0:
+        if not "False" in conclusion:
+            if not "=" in conclusion:
+                return False
+    return True
+
+def get_premises_that_partially_match_conclusion_args(premises, conclusion):
+    """
+    Returns premises where the predicates have at least one argument
+    in common with the conclusion.
+    """
+    candidate_premises = []
+    conclusion = re.sub(r'\?([0-9]+)', r'?x\1', conclusion)
+    conclusion_args = get_tree_pred_args(conclusion, is_conclusion=True)
+    if conclusion_args is None:
+        return candidate_premises
+    for premise_line in premises:
+        # Convert anonymous variables of the form ?345 into ?x345.
+        premise_line = re.sub(r'\?([0-9]+)', r'?x\1', premise_line)
+        premise_args = get_tree_pred_args(premise_line)
+        #print('Conclusion args: ' + str(conclusion_args) +
+        #              '\nPremise args: ' + str(premise_args), file=sys.stderr)
+        #if tree_contains(premise_args, conclusion_args):
+        if premise_args is None or "=" in premise_line:
+            # relation logical formulas
+            continue
+        else:
+            candidate_premises.append(premise_line)
+    return candidate_premises

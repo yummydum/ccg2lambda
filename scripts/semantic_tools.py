@@ -51,7 +51,7 @@ def get_formulas_from_doc(doc):
     formulas = [f for f in formulas if f is not None]
     return formulas
 
-def prove_doc(doc, abduction=None):
+def prove_doc(doc, abduction=None, target=None):
     """
     Retrieve from trees the logical formulas and the types
     (dynamic library).
@@ -81,9 +81,20 @@ def prove_doc(doc, abduction=None):
         else:
             inference_result_str = 'unknown'
     if abduction and inference_result_str == 'unknown':
-        inference_result_str, abduction_scripts = \
-            abduction.attempt(coq_scripts, doc)
-        coq_scripts.extend(abduction_scripts)
+        if target:
+            if target == 'yes' or target == 'no':
+                #continue abduction for phrase acquisition until inference_result_str matches target
+                inference_result_str, abduction_scripts = \
+                abduction.attempt(coq_scripts, doc, target)
+                coq_scripts.extend(abduction_scripts)
+                return inference_result_str, coq_scripts
+            else:
+                return inference_result_str, coq_scripts
+        else:
+            inference_result_str, abduction_scripts = \
+                abduction.attempt(coq_scripts, doc)
+            coq_scripts.extend(abduction_scripts)
+            
     return inference_result_str, coq_scripts
 
 # Check whether the string "is defined" appears in the output of coq.

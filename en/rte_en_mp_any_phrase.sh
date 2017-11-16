@@ -77,6 +77,21 @@ cat $sentences_fname | \
   sed 's/[[:space:]]*$//' \
   > ${plain_dir}/${sentences_basename}.tok
 
+# to do: use target_answer for phrase acquisition
+target_answer=`cat ${plain_dir}/${sentences_basename/.txt/}.answer`
+# if premise sentence contains "no", substitute "a" for "no"
+# In this case, the target answer changes from "contradiction" to "entailment"
+num=`grep -n " no " ${plain_dir}/${sentences_basename}.tok| sed -e 's/:.*//g'`
+if [ "$num" == 1 ]; then
+  echo "no contains in premise sentence"
+  sed -i '' -e "1 s/ no / a /g" ${plain_dir}/${sentences_basename}.tok
+  if [ "$target_answer" == "yes" ]; then
+    target_answer="no"
+  elif [ "$target_answer" = "no" ]; then
+    target_answer="yes"
+  fi
+fi
+
 # Set parser locations
 if [ ! -f "en/parser_location.txt" ]; then
   echo "Error: File for the locations of parsers does not exist."
@@ -279,6 +294,7 @@ function proving() {
       ${parsed_dir}/${sentences_basename}.${parser}.sem.xml \
       --graph_out ${results_dir}/${sentences_basename}.${parser}.html \
       --abduction phrase \
+      --target $target_answer \
       > ${results_dir}/${sentences_basename}.${parser}.answer \
       2> ${results_dir}/${sentences_basename}.${parser}.err
   rte_answer=`cat ${results_dir}/${sentences_basename}.${parser}.answer`
@@ -338,3 +354,4 @@ for parser in `cat en/parser_location.txt`; do
     select_answer ${parser_name}
   fi
 done
+
