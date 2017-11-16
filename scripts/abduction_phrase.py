@@ -48,8 +48,8 @@ def TryPhraseAbduction(coq_scripts, target):
     reverse_proof_script = coq_scripts[1]
     axioms = set()
     direct_proof_scripts, reverse_proof_scripts = [], []
-    inference_result_str, all_scripts = "", []
-    while inference_result_str == target:
+    inference_result_str, all_scripts = "unknown", []
+    while inference_result_str == "unknown":
         #continue abduction for phrase acquisition until inference_result_str matches target
         if target == 'yes':
             #entailment proof
@@ -64,7 +64,7 @@ def TryPhraseAbduction(coq_scripts, target):
                               previous_axioms=current_axioms, expected='no')
             current_axioms = axioms.union(new_reverse_axioms)
         all_scripts = direct_proof_scripts + reverse_proof_scripts
-        if len(axioms) == len(current_axioms) or inference_result_str != 'unknown':
+        if len(axioms) == len(current_axioms):
             break
         axioms = current_axioms
     return inference_result_str, all_scripts
@@ -92,7 +92,7 @@ def try_phrase_abduction(coq_script, previous_axioms=set(), expected='yes'):
         print(json.dumps(failure_log), file=sys.stderr)
         return 'unknown', [], previous_axioms
     axioms = make_phrase_axioms_from_premises_and_conclusion(premise_lines, conclusion, output_lines, expected)
-    axioms = filter_wrong_axioms(axioms, coq_script)
+    #axioms = filter_wrong_axioms(axioms, coq_script) temporarily
     axioms = axioms.union(previous_axioms)
     new_coq_script = insert_axioms_in_coq_script(axioms, coq_script)
     process = Popen(
@@ -100,8 +100,7 @@ def try_phrase_abduction(coq_script, previous_axioms=set(), expected='yes'):
         shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output_lines = [line.decode('utf-8').strip()
                     for line in process.stdout.readlines()]
-    inference_result_str = expected if is_theorem_almost_defined(
-        output_lines) else 'unknown'
+    inference_result_str = expected if is_theorem_almost_defined(output_lines) else 'unknown'
     return inference_result_str, [new_coq_script], axioms
 
 def make_phrase_axioms_from_premises_and_conclusion(premises, conclusions, coq_output_lines=None, expected='yes'):
@@ -109,9 +108,8 @@ def make_phrase_axioms_from_premises_and_conclusion(premises, conclusions, coq_o
     for conclusion in conclusions:
         matching_premises = get_premises_that_partially_match_conclusion_args(premises, conclusion)
         premise_preds = [premise.split()[2] for premise in matching_premises]
-        conclusion_pred = conclusion.split()[0]
         pred_args = get_predicate_arguments(matching_premises, conclusion)
-        axioms.update(make_phrase_axioms(premise_preds, conclusion_pred, pred_args, expected))
+        axioms.update(make_phrase_axioms(premise_preds, conclusion, pred_args, expected))
         #if not axioms:
         #    failure_log = make_failure_log(
         #        conclusion_pred, premise_preds, conclusion, premises, coq_output_lines)
@@ -141,53 +139,51 @@ def make_phrase_axioms(premise_preds, conclusion_pred, pred_args, expected):
     if expected == 'yes':
         phrase_axioms = get_phrases(premise_preds, conclusion_pred, pred_args)
         axioms.update(set(phrase_axioms))
-        if not axioms:
-            approx_axioms = get_probability_phrases(premise_preds, conclusion_pred, pred_args)
-            axioms.update(approx_axioms)
     elif expected == 'no':
         #to do: consider how to inject phrase axioms for the proof of contradiction
-        phrase_axioms = []
+        phrase_axioms = get_phrases(premise_preds, conclusion_pred, pred_args)
         axioms.update(set(phrase_axioms))
 
     return axioms
 
 def get_phrases(premise_preds, conclusion_pred, pred_args):
     #make phrases based on argument matching only
-    axioms = []
-    src_preds = [denormalize_token(p) for p in premise_preds]
-    trg_pred = denormalize_token(conclusion_pred)
-    if "False" in trg_pred or "=" in trg_pred:
-        return list(set(axioms))
-    print("premise_pred:{0}, conclusion_pred:{1}, src_preds:{2}, trg_pred:{3}".format(premise_preds, conclusion_pred, src_preds, trg_pred), file=sys.stderr)
-    #if len(src_preds) > 1:
-    #    to do?: select best src_pred
-    axiom = 'Axiom ax_phrase_{0}_{1} : forall x, _{0} x -> _{1} x.'\
-                .format(src_preds[0], trg_pred)
-    print("premise_pred:{0}, conclusion_pred:{1}, pred_args:{2}, axiom:{3}".format(premise_preds, conclusion_pred, pred_args, axiom), file=sys.stderr)
-    axioms.append(axiom)
-    return list(set(axioms))
-
-
-def get_probability_phrases(premise_preds, conclusion_pred, pred_args):
     #check existential variables in subgoals and estimate the best argument
     #make phrases based on multiple similarities:surface, external knowledge, category
     axioms = []
     src_preds = [denormalize_token(p) for p in premise_preds]
+    if "False" in conclusion_pred or "=" in conclusion_pred:
+        return list(set(axioms))
+    conclusion_pred = conclusion_pred.split()[0]
     trg_pred = denormalize_token(conclusion_pred)
+    print("premise_pred:{0}, conclusion_pred:{1}, src_preds:{2}, trg_pred:{3}".format(premise_preds, conclusion_pred, src_preds, trg_pred), file=sys.stderr)
+
     if len(src_preds) > 1:
         dist = []
         for src_pred in src_preds:
             wordnetsim = calc_wordnetsim(src_pred, trg_pred)
             ngramsim = calc_ngramsim(src_pred, trg_pred)
-            #categorysim = calc_categorysim(src_pred, trg_pred)
-            dist.append(distance.cityblock([1, 1], [wordnetsim, ngramsim]))
+            argumentsim = calc_argumentsim(src_pred, trg_pred, pred_args)
+            #temporarily
+            dist.append(distance.cityblock([1, 1, 1], [wordnetsim, ngramsim, argumentsim]))
         maxdist = dist.index(max(dist))
-        axiom = 'Axiom ax_approx_phrase_{0}_{1} : forall x, _{0} x -> _{1} x.'\
-                    .format(src_preds[maxdist], trg_pred)
+        best_src_pred = src_preds[maxdist]
+        best_src_pred_norm = normalize_token(best_src_pred)
+        best_src_pred_arg_list = pred_args[best_src_pred_norm]
+        best_src_pred_arg = " ".join(best_src_pred_arg_list)
+        trg_pred_norm = normalize_token(trg_pred)
+        trg_pred_arg_list = pred_args[trg_pred_norm]
+        trg_pred_arg = " ".join(trg_pred_arg_list)
+        total_arg_list = list(set(best_src_pred_arg_list + trg_pred_arg_list))
+        total_arg = " ".join(total_arg_list)
+        axiom = 'Axiom ax_phrase_{0}_{1} : forall {2}, _{0} {3} -> _{1} {4}.'\
+                    .format(best_src_pred, trg_pred, total_arg, best_src_pred_arg, trg_pred_arg)
+        print("premise_pred:{0}, conclusion_pred:{1}, pred_args:{2}, axiom:{3}".format(premise_preds, conclusion_pred, pred_args, axiom), file=sys.stderr)
         axioms.append(axiom)
     else:
-        axiom = 'Axiom ax_approx_phrase_{0}_{1} : forall x, _{0} x -> _{1} x.'\
-                    .format(src_preds[0], trg_pred)
+        axiom = 'Axiom ax_phrase_{0}_{1} : forall {2}, _{0} {3} -> _{1} {4}.'\
+                    .format(best_src_pred, trg_pred, total_arg, best_src_pred_arg, trg_pred_arg)
+        print("premise_pred:{0}, conclusion_pred:{1}, pred_args:{2}, axiom:{3}".format(premise_preds, conclusion_pred, pred_args, axiom), file=sys.stderr)
         axioms.append(axiom)
     return list(set(axioms))
 
@@ -215,19 +211,29 @@ def calc_ngramsim(sub_pred, prem_pred):
     ngramsim = difflib.SequenceMatcher(None, sub_pred, prem_pred).ratio()
     return ngramsim
 
-def calc_categorysim(sub_pred, prem_pred):
-    #to do:extract from sem.xml file
-    return categorysim
+def calc_argumentsim(sub_pred, prem_pred, pred_args):
+    #to do: how to estimate existential variable
+    sub_pred = normalize_token(sub_pred)
+    prem_pred = normalize_token(prem_pred)
+    if pred_args[sub_pred] == pred_args[prem_pred]:
+        return 1.0
+    elif pred_args[sub_pred] in pred_args[prem_pred]:
+        #ex. sub_goal: play x0, premise: with x0 x1
+        return 0.5
+    else:
+        return 0.0
+
 
 def is_theorem_almost_defined(output_lines):
     #to do:check if all content subgoals are deleted(remaining relation subgoals is permitted)
     #ignore relaional subgoals(False, Acc x0=x1) in the proof
-    conclusion = get_conclusion_lines(output_lines)
-    print("conclusion:{0}".format(conclusion), file=sys.stderr)
-    if len(conclusion) > 0:
-        if not "False" in conclusion:
-            if not "=" in conclusion:
-                return False
+    conclusions = get_conclusion_lines(output_lines)
+    print("conclusion:{0}".format(conclusions), file=sys.stderr)
+    if len(conclusions) > 0:
+        for conclusion in conclusions:
+            if not "False" in conclusion:
+                if not "=" in conclusion:
+                    return False
     return True
 
 def get_premises_that_partially_match_conclusion_args(premises, conclusion):
