@@ -105,9 +105,8 @@ def try_phrase_abduction(coq_script, previous_axioms=set(), expected='yes'):
 
 def make_phrase_axioms_from_premises_and_conclusion(premises, conclusions, coq_output_lines=None, expected='yes'):
     axioms = set()
-    #check existential variables
-    #if existential variable contain, estimate the probable arguments first
-    print("premises:{0}, conclusions:{1}".format(premises, conclusions), file=sys.stderr)
+    #check existential variables and if existential variable contain, estimate the probable arguments first
+    premises, conclusions = estimate_existential_variables(premises, conclusions)
 
     for conclusion in conclusions:
         matching_premises = get_premises_that_partially_match_conclusion_args(premises, conclusion)
@@ -147,7 +146,6 @@ def make_phrase_axioms(premise_preds, conclusion_pred, pred_args, expected):
     return axioms
 
 def get_phrases(premise_preds, conclusion_pred, pred_args, expected):
-    #to do: check existential variables in subgoals and estimate the best argument
     #make phrases based on multiple similarities: surface, external knowledge, argument matching
     #in some cases, considering argument matching only is better
     axiom, axioms = "", []
@@ -271,3 +269,10 @@ def get_premises_that_partially_match_conclusion_args(premises, conclusion):
         else:
             candidate_premises.append(premise_line)
     return candidate_premises
+
+def estimate_existential_variables(premises, conclusions):
+    #to do: check existential variables in subgoals and estimate the best variable
+    # estimate by number of arguments, case, lexical knowledge??
+    # substitute estimated variables for existential variables
+    print("premises:{0}, conclusions:{1}".format(premises, conclusions), file=sys.stderr)
+    return premises, conclusions
