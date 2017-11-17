@@ -274,5 +274,5 @@ def estimate_existential_variables(premises, conclusions):
     #to do: check existential variables in subgoals and estimate the best variable
     # estimate by number of arguments, case, lexical knowledge??
     # substitute estimated variables for existential variables
-    print("premises:{0}, conclusions:{1}".format(premises, conclusions), file=sys.stderr)
-    return premises, conclusions
+    # print("premises:{0}, conclusions:{1}".format(premises, conclusions), file=sys.stderr)
+    return list()
