@@ -275,4 +275,4 @@ def estimate_existential_variables(premises, conclusions):
     # estimate by number of arguments, case, lexical knowledge??
     # substitute estimated variables for existential variables
     # print("premises:{0}, conclusions:{1}".format(premises, conclusions), file=sys.stderr)
-    return list()
+    return set()

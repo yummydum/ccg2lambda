@@ -40,13 +40,13 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             '_piece ?775',
             '_into x1 ?775',
             '_woman (Subj x1)']
-        expected_axioms = [
+        expected_axioms = set([
             'Axiom ax_phrase_cut_into : forall x1 y0, _cut x1 -> _into x1 y0.',
-            'Axiom ax_phrase_cut_piece : forall x1 y0, _cut x1 -> _piece y0.']
+            'Axiom ax_phrase_cut_piece : forall x1 y0, _cut x1 -> _piece y0.'])
         axioms = estimate_existential_variables(premises, conclusions)
         self.assertEqual(expected_axioms, axioms)
 
-    def test_(self):
+    def test_protective_gear(self):
         premises = [
             'H1 : True',
             'x0 : Event',
@@ -65,10 +65,10 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             'Acc ?4844 = x1',
             '_protection ?5065',
             '_for ?4844 ?5065']
-        expected_axioms = [
+        expected_axioms = set([
             'Axiom ax_phrase_protective_use : forall x1 y0, _protective x1 -> _use y0.',
             'Axiom ax_phrase_protective_protection : forall x1 y0, _protective x1 -> _protection y0.',
-            'Axiom ax_phrase_protective_for : forall x1 y0 y1, _protective x1 -> _for y0 y1.']
+            'Axiom ax_phrase_protective_for : forall x1 y0 y1, _protective x1 -> _for y0 y1.'])
         axioms = estimate_existential_variables(premises, conclusions)
         self.assertEqual(expected_axioms, axioms)
 
