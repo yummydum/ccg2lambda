@@ -19,11 +19,6 @@ import unittest
 
 from abduction_phrase import estimate_existential_variables
 
-
-from abduction_tools import get_tree_pred_args
-from abduction_tools import get_premises_that_match_conclusion_args
-from tree_tools import tree_or_string
-
 class EstimateExistentialVariablesTestCase(unittest.TestCase):
     def test_cut_into_piece(self):
         premises = [
@@ -69,6 +64,22 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             'Axiom ax_phrase_protective_use : forall x1 y0, _protective x1 -> _use y0.',
             'Axiom ax_phrase_protective_protection : forall x1 y0, _protective x1 -> _protection y0.',
             'Axiom ax_phrase_protective_for : forall x1 y0 y1, _protective x1 -> _for y0 y1.'])
+        axioms = estimate_existential_variables(premises, conclusions)
+        self.assertEqual(expected_axioms, axioms)
+
+    def test_sidewalk(self):
+        premises = [
+            ' _skip x1',
+            ' _on x1 x2',
+            ' _sidewalk x2',
+            ' _girl (Subj x1)',
+            ' _rope (Acc x1)']
+        conclusions = [
+            '_street ?2961',
+            '_near x1 ?2961']
+        expected_axioms = set([
+            'Axiom ax_phrase_skip_street : forall x1 y0, _skip x1 -> _street y0.',
+            'Axiom ax_phrase_skip_near : forall x1 y0 y1, _skip x1 -> _near y0 y1.'])
         axioms = estimate_existential_variables(premises, conclusions)
         self.assertEqual(expected_axioms, axioms)
 

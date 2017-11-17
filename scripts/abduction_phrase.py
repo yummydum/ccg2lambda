@@ -270,9 +270,30 @@ def get_premises_that_partially_match_conclusion_args(premises, conclusion):
             candidate_premises.append(premise_line)
     return candidate_premises
 
+def contains_case(coq_line):
+    """
+    Returns True if the coq_line contains a case predicate, e.g.
+    'H0 : _meat (Acc x1)'
+    'H : _lady (Subj x1)'
+    Returns False otherwise.
+    We assume that case is specified by an uppercase character
+    followed by at least two lowercased characters, e.g. Acc, Subj, Dat, etc.
+    """
+    if re.search(r'[A-Z][a-z][a-z]', coq_line):
+        return True
+    return False
+
+from abduction_tools import get_tree_pred_args
+
+def cluster_args(coq_lines):
+    return []
+
 def estimate_existential_variables(premises, conclusions):
     #to do: check existential variables in subgoals and estimate the best variable
     # estimate by number of arguments, case, lexical knowledge??
     # substitute estimated variables for existential variables
     # print("premises:{0}, conclusions:{1}".format(premises, conclusions), file=sys.stderr)
+    premises = [p for p in premises if not contains_case(p) and p.split()[2].startswith('_')]
+    conclusions = [c for c in conclusions if not contains_case(c) and c.split()[0].startswith('_')]
+    args_to_preds = cluster_args(premises)
     return set()
