@@ -284,8 +284,40 @@ def contains_case(coq_line):
     return False
 
 from abduction_tools import get_tree_pred_args
+from tree_tools import is_string
 
-def cluster_args(coq_lines):
+def cluster_args(premises, conclusions):
+    p_pred_args = {}
+    for p in premises:
+        predicate = p.split()[2]
+        args = get_tree_pred_args(p, is_conclusion=False)
+        if args is not None:
+            if not is_string(args):
+                p_pred_args[predicate] = args.leaves()
+            else:
+                p_pred_args[predicate] = [args]
+
+    c_pred_args = {}
+    for c in conclusion:
+        predicate = c.split()[0]
+        args = get_tree_pred_args(c, is_conclusion=True)
+        if args is not None:
+            if not is_string(args):
+                c_pred_args[predicate] = args.leaves()
+            else:
+                c_pred_args[predicate] = [args]
+
+    c_args_preds = defaultdict(set)
+    for pred, args in c_pred_args.items():
+        for arg in args:
+            c_args_preds[frozenset([arg])].add(pred)
+        c_args_preds[frozenset(args)].add(pred)
+    for args, preds in list(c_args_preds.items()):
+        for targs in list(c_args_preds.values()):
+            if args.issubset(targs):
+                c_args_preds[targs].update(preds)
+    print(c_args_preds)
+
     return []
 
 def estimate_existential_variables(premises, conclusions):

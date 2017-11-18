@@ -17,7 +17,7 @@
 
 import unittest
 
-from abduction_phrase import estimate_existential_variables
+from abduction_phrase_p import estimate_existential_variables
 
 class EstimateExistentialVariablesTestCase(unittest.TestCase):
     def test_cut_into_piece(self):
@@ -36,8 +36,8 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             '_into x1 ?775',
             '_woman (Subj x1)']
         expected_axioms = set([
-            'Axiom ax_phrase_cut_into : forall x1 y0, _cut x1 -> _into x1 y0.',
-            'Axiom ax_phrase_cut_piece : forall x1 y0, _cut x1 -> _piece y0.'])
+            'Axiom ax_phrase_cut_into : forall x0 y0, _cut x0 -> _into x0 y0.',
+            'Axiom ax_phrase_cut_piece : forall x0 y0, _cut x0 -> _piece y0.'])
         axioms = estimate_existential_variables(premises, conclusions)
         self.assertEqual(expected_axioms, axioms)
 
@@ -61,25 +61,26 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             '_protection ?5065',
             '_for ?4844 ?5065']
         expected_axioms = set([
-            'Axiom ax_phrase_protective_use : forall x1 y0, _protective x1 -> _use y0.',
-            'Axiom ax_phrase_protective_protection : forall x1 y0, _protective x1 -> _protection y0.',
-            'Axiom ax_phrase_protective_for : forall x1 y0 y1, _protective x1 -> _for y0 y1.'])
+            'Axiom ax_phrase_protective_use : forall x0 y0, _protective x0 -> _use y0.',
+            'Axiom ax_phrase_protective_protection : forall x0 y0, _protective x0 -> _protection y0.',
+            'Axiom ax_phrase_protective_for : forall x0 y0 y1, _protective x0 -> _for y0 y1.'])
         axioms = estimate_existential_variables(premises, conclusions)
         self.assertEqual(expected_axioms, axioms)
 
     def test_sidewalk(self):
         premises = [
-            ' _skip x1',
-            ' _on x1 x2',
-            ' _sidewalk x2',
-            ' _girl (Subj x1)',
-            ' _rope (Acc x1)']
+            'H1 : _skip x1',
+            'H2 : _on x1 x2',
+            'H3 : _sidewalk x2',
+            'H4 : _girl (Subj x1)',
+            'H5 : _rope (Acc x1)']
         conclusions = [
             '_street ?2961',
             '_near x1 ?2961']
         expected_axioms = set([
-            'Axiom ax_phrase_skip_street : forall x1 y0, _skip x1 -> _street y0.',
-            'Axiom ax_phrase_skip_near : forall x1 y0 y1, _skip x1 -> _near y0 y1.'])
+            'Axiom ax_phrase_skip_street : forall x0 y0, _skip x0 -> _street y0.',
+            'Axiom ax_phrase_skip_near : forall x0 y0 y1, _skip x0 -> _near y0 y1.'])
+        # from pudb import set_trace; set_trace()
         axioms = estimate_existential_variables(premises, conclusions)
         self.assertEqual(expected_axioms, axioms)
 
