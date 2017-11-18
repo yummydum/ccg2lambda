@@ -64,6 +64,7 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             'Axiom ax_phrase_protective_use : forall x0 y0, _protective x0 -> _use y0.',
             'Axiom ax_phrase_protective_protection : forall x0 y0, _protective x0 -> _protection y0.',
             'Axiom ax_phrase_protective_for : forall x0 y0 y1, _protective x0 -> _for y0 y1.'])
+        # from pudb import set_trace; set_trace()
         axioms = estimate_existential_variables(premises, conclusions)
         self.assertEqual(expected_axioms, axioms)
 
@@ -80,7 +81,6 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
         expected_axioms = set([
             'Axiom ax_phrase_skip_street : forall x0 y0, _skip x0 -> _street y0.',
             'Axiom ax_phrase_skip_near : forall x0 y0 y1, _skip x0 -> _near y0 y1.'])
-        # from pudb import set_trace; set_trace()
         axioms = estimate_existential_variables(premises, conclusions)
         self.assertEqual(expected_axioms, axioms)
 

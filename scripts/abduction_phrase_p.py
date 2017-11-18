@@ -20,7 +20,7 @@ def get_tree_pred_args(line, is_conclusion=False):
         tree_args = parse_coq_line(line)
     if tree_args is None or is_string(tree_args) or len(tree_args) < 1:
         return None
-    return tree_args.leaves()
+    return [l for l in tree_args.leaves() if l != '=']
 
 def contains_case(coq_line):
     """
@@ -50,6 +50,7 @@ def cluster_args(premises, conclusions):
         if args is not None:
             c_pred_args[predicate] = args
 
+    # Compute relations between arguments as frozensets.
     c_args_preds = defaultdict(set)
     for pred, args in c_pred_args.items():
         for arg in args:
@@ -60,15 +61,15 @@ def cluster_args(premises, conclusions):
         for targs in list(c_args_preds.keys()):
             if args.issubset(targs):
                 c_args_preds[targs].update(preds)
-    # print(c_args_preds)
 
     axioms = set()
     phrase_pairs = []
     for args, c_preds in c_args_preds.items():
         if len(args) > 1:
             premise_preds = [p for p, p_args in p_pred_args.items() if set(p_args).issubset(args)]
-            # Save phrase pairs for Yanaka-san:
+            premise_preds = [p for p in premise_preds if not contains_case(p)]
             if premise_preds:
+                # Save phrase pairs for Yanaka-san:
                 phrase_pairs.append((premise_preds, preds))
                 premise_pred = sorted(premise_preds)[0]
                 for p in c_preds:
@@ -89,6 +90,6 @@ def estimate_existential_variables(premises, conclusions):
     # substitute estimated variables for existential variables
     # print("premises:{0}, conclusions:{1}".format(premises, conclusions), file=sys.stderr)
     premises = [p for p in premises if not contains_case(p) and p.split()[2].startswith('_')]
-    conclusions = [c for c in conclusions if not contains_case(c) and c.split()[0].startswith('_')]
+    # conclusions = [c for c in conclusions if c.split()[0].startswith('_')]
     args_to_preds = cluster_args(premises, conclusions)
     return set()
