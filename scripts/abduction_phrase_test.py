@@ -17,7 +17,7 @@
 
 import unittest
 
-from abduction_phrase_p import make_phrases_from_premises_and_conclusions
+from abduction_phrase import *
 
 class EstimateExistentialVariablesTestCase(unittest.TestCase):
     def test_cut_into_piece(self):
@@ -38,7 +38,7 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
         expected_axioms = set([
             'Axiom ax_phrase_cut_into : forall x0 y0 y1, _cut x0 -> _into y0 y1.',
             'Axiom ax_phrase_cut_piece : forall x0 y0, _cut x0 -> _piece y0.'])
-        axioms = make_phrases_from_premises_and_conclusions(premises, conclusions)
+        axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
         self.assertEqual(expected_axioms, axioms,
             msg="{0} vs. {1}".format(expected_axioms, axioms))
 
@@ -65,7 +65,7 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             'Axiom ax_phrase_gear_use : forall x0 y0, _gear x0 -> _use y0.',
             'Axiom ax_phrase_gear_protection : forall x0 y0, _gear x0 -> _protection y0.',
             'Axiom ax_phrase_gear_for : forall x0 y0 y1, _gear x0 -> _for y0 y1.'])
-        axioms = make_phrases_from_premises_and_conclusions(premises, conclusions)
+        axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
         self.assertEqual(expected_axioms, axioms,
             msg="{0} vs. {1}".format(expected_axioms, axioms))
 
@@ -83,7 +83,7 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             'Axiom ax_phrase_skip_street : forall x0 y0, _skip x0 -> _street y0.',
             'Axiom ax_phrase_skip_near : forall x0 y0 y1, _skip x0 -> _near y0 y1.'])
         # from pudb import set_trace; set_trace()
-        axioms = make_phrases_from_premises_and_conclusions(premises, conclusions)
+        axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
         self.assertEqual(expected_axioms, axioms,
             msg="{0} vs. {1}".format(expected_axioms, axioms))
 
