@@ -122,7 +122,7 @@ def make_phrase_axioms(premises, conclusions, coq_output_lines=None, expected='y
         axioms.update(make_phrase_axioms_from_premises_and_conclusions(premise_preds, conclusion, pred_args, expected))
         if not axioms:
             failure_log = make_failure_log(
-                conclusion_pred, premise_preds, conclusion, premises, coq_output_lines)
+                conclusion, premise_preds, conclusion, premises, coq_output_lines)
             print(json.dumps(failure_log), file=sys.stderr)
     return axioms
 
