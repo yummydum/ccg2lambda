@@ -187,6 +187,7 @@ def get_phrases(premise_preds, conclusion_pred, pred_args, expected):
         trg_pred_arg = " ".join(trg_pred_arg_list)
         
         total_arg_list = list(set(best_src_pred_arg_list + trg_pred_arg_list))
+        total_arg_list = check_case_from_list(total_arg_list)
         total_arg = " ".join(total_arg_list)
         
         axiom = 'Axiom ax_phrase_{0}_{1} : forall {2}, _{0} {3} -> _{1} {4}.'\
@@ -202,6 +203,7 @@ def get_phrases(premise_preds, conclusion_pred, pred_args, expected):
         trg_pred_arg = " ".join(trg_pred_arg_list)
         
         total_arg_list = list(set(src_pred_arg_list + trg_pred_arg_list))
+        total_arg_list = check_case_from_list(total_arg_list)
         total_arg = " ".join(total_arg_list)
         axiom = 'Axiom ax_phrase_{0}_{1} : forall {2}, _{0} {3} -> _{1} {4}.'\
                     .format(src_preds[0], trg_pred, total_arg, src_pred_arg, trg_pred_arg)
@@ -214,6 +216,15 @@ def get_phrases(premise_preds, conclusion_pred, pred_args, expected):
     axioms.append(axiom)
     return list(set(axioms))
 
+def check_case_from_list(total_arg_list):
+    new_total_arg_list = []
+    for t in total_arg_list:
+        if contains_case(t):
+            t_arg = re.search("([xyz][0-9]*)", t).group(1)
+            new_total_arg_list.append(t_arg)
+        else:
+            new_total_arg_list.append(t)
+    return new_total_arg_list
 
 def calc_wordnetsim(sub_pred, prem_pred):
     wordnetsim = 0.0
@@ -413,8 +424,15 @@ def get_predicate_case_arguments(premises, conclusion):
         pred = t.label()
         #if args have case information, extract the pair of case and variables in $args
         #ex. extract Subj x1 as argas in Tree('_lady', [Tree('Subj', ['x1'])])
-        args = t.leaves()
-        pred_args_list.append([pred] + args)
+        #args = t.leaves()
+        if len(t) == 1:
+            args = str(t[0])
+            pred_args_list.append([pred] + [args])
+        else:
+            args = []
+            for tt in t:
+                args.append(tt)
+            pred_args_list.append([pred] + args)
     conflicting_predicates = set()
     print("pred_trees:{0}, pred_args:{1}".format(pred_trees, pred_args_list), file=sys.stderr)
     for pa in pred_args_list:
