@@ -224,7 +224,8 @@ def check_case_from_list(total_arg_list):
             new_total_arg_list.append(t_arg)
         else:
             new_total_arg_list.append(t)
-    return new_total_arg_list
+    sorted_new_total_arg_list = list(set(new_total_arg_list))
+    return sorted_new_total_arg_list
 
 def calc_wordnetsim(sub_pred, prem_pred):
     wordnetsim = 0.0
@@ -425,14 +426,10 @@ def get_predicate_case_arguments(premises, conclusion):
         #if args have case information, extract the pair of case and variables in $args
         #ex. extract Subj x1 as argas in Tree('_lady', [Tree('Subj', ['x1'])])
         #args = t.leaves()
-        if len(t) == 1:
-            args = str(t[0])
-            pred_args_list.append([pred] + [args])
-        else:
-            args = []
-            for tt in t:
-                args.append(tt)
-            pred_args_list.append([pred] + args)
+        args = []
+        for tt in t:
+            args.append(str(tt))
+        pred_args_list.append([pred] + args)
     conflicting_predicates = set()
     print("pred_trees:{0}, pred_args:{1}".format(pred_trees, pred_args_list), file=sys.stderr)
     for pa in pred_args_list:
