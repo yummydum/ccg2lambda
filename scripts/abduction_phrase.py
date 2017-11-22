@@ -190,8 +190,8 @@ def get_phrases(premise_preds, conclusion_pred, pred_args, expected):
         total_arg_list = check_case_from_list(total_arg_list)
         total_arg = " ".join(total_arg_list)
         
-        axiom = 'Axiom ax_phrase_{0}_{1} : forall {2}, _{0} {3} -> _{1} {4}.'\
-                    .format(best_src_pred, trg_pred, total_arg, best_src_pred_arg, trg_pred_arg)
+        axiom = 'Axiom ax_phrase{0}{1} : forall {2}, {0} {3} -> {1} {4}.'\
+                    .format(best_src_pred_norm, trg_pred_norm, total_arg, best_src_pred_arg, trg_pred_arg)
 
     else:
         src_pred_norm = normalize_token(src_pred)
@@ -205,8 +205,8 @@ def get_phrases(premise_preds, conclusion_pred, pred_args, expected):
         total_arg_list = list(set(src_pred_arg_list + trg_pred_arg_list))
         total_arg_list = check_case_from_list(total_arg_list)
         total_arg = " ".join(total_arg_list)
-        axiom = 'Axiom ax_phrase_{0}_{1} : forall {2}, _{0} {3} -> _{1} {4}.'\
-                    .format(src_preds[0], trg_pred, total_arg, src_pred_arg, trg_pred_arg)
+        axiom = 'Axiom ax_phrase{0}{1} : forall {2}, {0} {3} -> {1} {4}.'\
+                    .format(src_pred_norm, trg_pred_norm, total_arg, src_pred_arg, trg_pred_arg)
     print("premise_pred:{0}, conclusion_pred:{1}, pred_args:{2}, axiom:{3}".format(premise_preds, conclusion_pred, pred_args, axiom), file=sys.stderr)
 
     # to do: consider how to inject antonym axioms
@@ -430,15 +430,20 @@ def get_predicate_case_arguments(premises, conclusion):
         for tt in t:
             args.append(str(tt))
         pred_args_list.append([pred] + args)
-    conflicting_predicates = set()
+    #conflicting_predicates = set()
     print("pred_trees:{0}, pred_args:{1}".format(pred_trees, pred_args_list), file=sys.stderr)
+    count = {}
     for pa in pred_args_list:
         pred = pa[0]
         args = pa[1:]
+        if pred not in count:
+            count[pred] = 0
+            pred_args[pred] = args
         if pred in pred_args and pred_args[pred] != args:
-            conflicting_predicates.add(pred)
-        pred_args[pred] = args
-    logging.debug('Conflicting predicates: ' + str(conflicting_predicates))
-    for conf_pred in conflicting_predicates:
-        del pred_args[conf_pred]
+            #conflicting_predicates.add(pred)
+            count[pred] += 1
+            pred_args[pred+"_"+str(count[pred])] = args        
+    #logging.debug('Conflicting predicates: ' + str(conflicting_predicates))
+    #for conf_pred in conflicting_predicates:
+    #    del pred_args[conf_pred]
     return pred_args
