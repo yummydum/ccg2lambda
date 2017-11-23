@@ -210,9 +210,6 @@ def get_phrases(premise_preds, conclusion_pred, pred_args, expected):
     print("premise_pred:{0}, conclusion_pred:{1}, pred_args:{2}, axiom:{3}".format(premise_preds, conclusion_pred, pred_args, axiom), file=sys.stderr)
 
     # to do: consider how to inject antonym axioms
-    if expected == "no":
-        #make A->B->False axiom
-        axiom = re.sub(".", " -> False.", axiom)
     axioms.append(axiom)
     return list(set(axioms))
 
@@ -278,6 +275,11 @@ def get_premises_that_partially_match_conclusion_args(premises, conclusion):
     """
     Returns premises where the predicates have at least one argument
     in common with the conclusion.
+    In this function, premises containing False are excluded temporarily. For example,
+    H0 : forall x : Entity,
+       ((_man x /\ (exists e : Event, (_drawing e /\ Subj e = x) /\ True)) /\
+        True) /\ (exists e : Event, Subj e = Subj e /\ True) -> False
+    to do: how to exclude such an premise perfectly
     """
     candidate_premises = []
     conclusion = re.sub(r'\?([0-9]+)', r'?x\1', conclusion)
@@ -291,11 +293,12 @@ def get_premises_that_partially_match_conclusion_args(premises, conclusion):
         #print('Conclusion args: ' + str(conclusion_args) +
         #              '\nPremise args: ' + str(premise_args), file=sys.stderr)
         #if tree_contains(premise_args, conclusion_args):
-        if premise_args is None or "=" in premise_line:
+        if premise_args is None or "H :" in premise_line or "exists" in premise_line or "=" in premise_line or "forall" in premise_line or "/\\" in premise_line:
             # ignore relation premises temporarily
             continue
         else:
             candidate_premises.append(premise_line)
+    #print(candidate_premises, file=sys.stderr)
     return candidate_premises
 
 def get_tree_pred_args_ex(line, is_conclusion=False):
@@ -431,7 +434,6 @@ def get_predicate_case_arguments(premises, conclusion):
             args.append(str(tt))
         pred_args_list.append([pred] + args)
     #conflicting_predicates = set()
-    print("pred_trees:{0}, pred_args:{1}".format(pred_trees, pred_args_list), file=sys.stderr)
     count = {}
     for pa in pred_args_list:
         pred = pa[0]
