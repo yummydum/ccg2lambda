@@ -116,8 +116,6 @@ def make_phrase_axioms(premises, conclusions, coq_output_lines=None, expected='y
     for conclusion in conclusions_normal:
         matching_premises = get_premises_that_partially_match_conclusion_args(premises, conclusion)
         premise_preds = [premise.split()[2] for premise in matching_premises]
-
-        #to do: extract all info(cases, variables) about arguments
         pred_args = get_predicate_case_arguments(matching_premises, conclusion)
         axioms.update(make_phrase_axioms_from_premises_and_conclusions(premise_preds, conclusion, pred_args, expected))
         if not axioms:

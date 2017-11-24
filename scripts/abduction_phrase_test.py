@@ -88,7 +88,9 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             msg="{0} vs. {1}".format(expected_axioms, axioms))
 
     def test_water_scooter(self):
-        #sick_trial_3373
+        #sick_trial_3373 
+        #A woman is riding a water scooter.
+        #A woman is riding a scooter for water.
         premises = [
             'H1 : _ride x1',
             'H2 : _woman (Subj x1)',
@@ -105,6 +107,8 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
 
     def test_sewing(self):
         #sick_trial_2166
+        #A woman is sewing with a machine.
+        #A woman is using a machine made for sewing.
         premises = [
             'H1 : _sew x0',
             'H2 : _with x0 x1',
@@ -123,6 +127,57 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
         axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
         self.assertEqual(expected_axioms, axioms,
             msg="{0} vs. {1}".format(expected_axioms, axioms))
+
+    def test_leap(self):
+        #sick_trial_6634
+        #A hurdle is being leapt by a horse that has a rider on its back.
+        #A horse and its rider are leaping over a barrier.
+        #containing duplicated sub-goals
+        premises = [
+            'H1 : _back x4',
+            'H2 : _on x5 x4',
+            'H3 : _leap x0',
+            'H4 : _have x0',
+            'H5 : _rider (Subj x5)',
+            'H6 : Subj x5 = Acc x0',
+            'H7 : _horse (Subj x0)',
+            'H8 : _hurdle (Subj x5)']
+        conclusions = [
+            '_barrier ?5689',
+            '_over x0 ?5689',
+            '_barrier ?6027',
+            '_over x5 ?6027']
+        expected_axioms = set([
+            'Axiom ax_phrase_leap_barrier : forall x0 y0, _leap x0 -> _barrier y0.',
+            'Axiom ax_phrase_leap_over : forall x0 y0, _leap x0 -> _over x0 y0.'])
+        axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
+        self.assertEqual(expected_axioms, axioms,
+            msg="{0} vs. {1}".format(expected_axioms, axioms))
+
+    #def test_snowboard_future_work(self):
+        #sick_trial_6932 (Future Work)
+        #The snowboarder is doing a flip over a mound of snow.
+        #Somebody is jumping in the air on a board.
+        #There is no argument sharing with sub-goals containing existential variables
+        #premises = [
+        #    'H1 : _do x1',
+        #    'H2 : _snow x4',
+        #    'H3 : _mound x4',
+        #    'H4 : _over x3 x4',
+        #    'H5 : _flip (Subj x3)',
+        #    'H6 : Subj x3 = Acc x1',
+        #    'H7 : _snowboarder (Subj x1)']
+        #conclusions = [
+        #    '_jump ?2675',
+        #    '_air ?2953',
+        #    '_in ?2675 ?2953',
+        #    '_board ?3186',
+        #    '_on ?2675 ?3186']
+        #expected_axioms = set([
+        #    'Axiom ax_phrase_do_jump : forall x0 y0, _do x0 -> _jump y0.'])
+        #axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
+        #self.assertEqual(expected_axioms, axioms,
+        #    msg="{0} vs. {1}".format(expected_axioms, axioms))
 
 
 if __name__ == '__main__':
