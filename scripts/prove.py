@@ -41,7 +41,7 @@ def main(args = None):
     parser.add_argument("--graph_out", nargs='?', type=str, default="",
         help="HTML graphical output filename.")
     parser.add_argument("--abduction", nargs='?', type=str, default="no",
-        choices=["no", "naive", "spsa", "phrase"],
+        choices=["no", "naive", "spsa", "phrase", "phrase_eval"],
         help="Activate on-demand axiom injection (default: no axiom injection).")
     parser.add_argument("--target", nargs='?', type=str, default="",
         help="The correct(target) answer used for phrase acquisition.")
@@ -65,6 +65,9 @@ def main(args = None):
     elif args.abduction == "phrase":
         from abduction_phrase import AxiomsPhrase
         abduction = AxiomsPhrase()
+    elif args.abduction == "phrase_eval":
+        from abduction_phrase_eval import AxiomsPhraseEval
+        abduction = AxiomsPhraseEval()
 
     parser = etree.XMLParser(remove_blank_text=True)
     doc = etree.parse(args.sem, parser)
