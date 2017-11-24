@@ -88,6 +88,7 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             msg="{0} vs. {1}".format(expected_axioms, axioms))
 
     def test_water_scooter(self):
+        #sick_trial_3373
         premises = [
             'H1 : _ride x1',
             'H2 : _woman (Subj x1)',
@@ -98,10 +99,31 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             'Subj ?2914 = Acc x1']
         expected_axioms = set([
             'Axiom ax_ex_phrase_scooter_for : forall x0 y0, _scooter x0 -> _for y0 x0.'])
-        # from pudb import set_trace; set_trace()
         axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
         self.assertEqual(expected_axioms, axioms,
             msg="{0} vs. {1}".format(expected_axioms, axioms))
+
+    def test_sewing(self):
+        #sick_trial_2166
+        premises = [
+            'H1 : _sew x0',
+            'H2 : _with x0 x1',
+            'H3 : _machine x1',
+            'H4 : _woman (Subj x0)']
+        conclusions = [
+            '_make ?3353',
+            'Acc ?3353 = x1',
+            '_sewing ?3565',
+            '_for ?3353 ?3565',
+            'Acc x0 = x1']
+        expected_axioms = set([
+            'Axiom ax_ex_phrase_machine_make : forall x0 y0, _machine x0 -> _make y0.',
+            'Axiom ax_ex_phrase_machine_for : forall x0 y0 y1, _machine x0 -> _for y0 y1.',
+            'Axiom ax_ex_phrase_machine_sewing : forall x0 y1, _machine x0 -> _sewing y1.'])
+        axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
+        self.assertEqual(expected_axioms, axioms,
+            msg="{0} vs. {1}".format(expected_axioms, axioms))
+
 
 if __name__ == '__main__':
     suite1 = unittest.TestLoader().loadTestsFromTestCase(EstimateExistentialVariablesTestCase)
