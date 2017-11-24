@@ -163,50 +163,34 @@ def get_phrases(premise_preds, conclusion_pred, pred_args, expected):
     conclusion_pred = conclusion_pred.split()[0]
     trg_pred = denormalize_token(conclusion_pred)
 
-    if len(src_preds) > 1:
-        dist = []
-        for src_pred in src_preds:
-            wordnetsim = calc_wordnetsim(src_pred, trg_pred)
-            ngramsim = calc_ngramsim(src_pred, trg_pred)
-            argumentsim = calc_argumentsim(src_pred, trg_pred, pred_args)
-            #to consider: add categorysim or parse score for smoothing argument match error
-            #to consider: how to decide the weight of each info(for now, consider no weight)
-            # best score: w_1*wordnetsim + w_2*ngramsim + w_3*argumentsim
-            # w_1+w_2+w_3 = 1
-            # 0 < wordnetsim < 1, 0 < ngramsim < 1, 0 < argumentsim < 1,
-            dist.append(distance.cityblock([1, 1, 1], [wordnetsim, ngramsim, argumentsim]))
-        mindist = dist.index(min(dist))
+    dist = []
+    for src_pred in src_preds:
+        wordnetsim = calc_wordnetsim(src_pred, trg_pred)
+        ngramsim = calc_ngramsim(src_pred, trg_pred)
+        argumentsim = calc_argumentsim(src_pred, trg_pred, pred_args)
+        #to consider: add categorysim or parse score for smoothing argument match error
+        #to consider: how to decide the weight of each info(for now, consider no weight)
+        # best score: w_1*wordnetsim + w_2*ngramsim + w_3*argumentsim
+        # w_1+w_2+w_3 = 1
+        # 0 < wordnetsim < 1, 0 < ngramsim < 1, 0 < argumentsim < 1,
+        dist.append(distance.cityblock([1, 1, 1], [wordnetsim, ngramsim, argumentsim]))
+    mindist = dist.index(min(dist))
 
-        best_src_pred = src_preds[mindist]
-        best_src_pred_norm = normalize_token(best_src_pred)
-        best_src_pred_arg_list = pred_args[best_src_pred_norm]
-        best_src_pred_arg = " ".join(best_src_pred_arg_list)
+    best_src_pred = src_preds[mindist]
+    best_src_pred_norm = normalize_token(best_src_pred)
+    best_src_pred_arg_list = pred_args[best_src_pred_norm]
+    best_src_pred_arg = " ".join(best_src_pred_arg_list)
 
-        trg_pred_norm = normalize_token(trg_pred)
-        trg_pred_arg_list = pred_args[trg_pred_norm]
-        trg_pred_arg = " ".join(trg_pred_arg_list)
+    trg_pred_norm = normalize_token(trg_pred)
+    trg_pred_arg_list = pred_args[trg_pred_norm]
+    trg_pred_arg = " ".join(trg_pred_arg_list)
         
-        total_arg_list = list(set(best_src_pred_arg_list + trg_pred_arg_list))
-        total_arg_list = check_case_from_list(total_arg_list)
-        total_arg = " ".join(total_arg_list)
+    total_arg_list = list(set(best_src_pred_arg_list + trg_pred_arg_list))
+    total_arg_list = check_case_from_list(total_arg_list)
+    total_arg = " ".join(total_arg_list)
         
-        axiom = 'Axiom ax_phrase{0}{1} : forall {2}, {0} {3} -> {1} {4}.'\
-                    .format(best_src_pred_norm, trg_pred_norm, total_arg, best_src_pred_arg, trg_pred_arg)
-
-    else:
-        src_pred_norm = normalize_token(src_pred)
-        src_pred_arg_list = pred_args[src_pred_norm]
-        src_pred_arg = " ".join(src_pred_arg_list)
-
-        trg_pred_norm = normalize_token(trg_pred)
-        trg_pred_arg_list = pred_args[trg_pred_norm]
-        trg_pred_arg = " ".join(trg_pred_arg_list)
-        
-        total_arg_list = list(set(src_pred_arg_list + trg_pred_arg_list))
-        total_arg_list = check_case_from_list(total_arg_list)
-        total_arg = " ".join(total_arg_list)
-        axiom = 'Axiom ax_phrase{0}{1} : forall {2}, {0} {3} -> {1} {4}.'\
-                    .format(src_pred_norm, trg_pred_norm, total_arg, src_pred_arg, trg_pred_arg)
+    axiom = 'Axiom ax_phrase{0}{1} : forall {2}, {0} {3} -> {1} {4}.'\
+            .format(best_src_pred_norm, trg_pred_norm, total_arg, best_src_pred_arg, trg_pred_arg)
     print("premise_pred:{0}, conclusion_pred:{1}, pred_args:{2}, axiom:{3}".format(premise_preds, conclusion_pred, pred_args, axiom), file=sys.stderr)
 
     # to do: consider how to inject antonym axioms
