@@ -154,7 +154,10 @@ def get_phrases(premise_preds, conclusion_pred, pred_args, expected):
     trg_pred = denormalize_token(conclusion_pred)
     for src_pred in src_preds:
         nor_src_pred = normalize_token(src_pred)
-        axiom = search_axioms_from_db(src_pred, trg_pred, pred_args[conclusion_pred], pred_args[nor_src_pred])
+        allarg_list = list(set(pred_args[conclusion_pred] + pred_args[nor_src_pred]))
+        allarg_list = check_case_from_list(allarg_list)
+        allarg = " ".join(allarg_list)
+        axiom = search_axioms_from_db(src_pred, trg_pred, pred_args[conclusion_pred], pred_args[nor_src_pred], allarg)
         #to do: select best axiom from premises(or make phrasal axiom coq_script)
         if axiom:
             axioms.append(axiom)
@@ -163,46 +166,49 @@ def get_phrases(premise_preds, conclusion_pred, pred_args, expected):
 
     return list(set(axioms))
 
-def search_axioms_from_db(src_pred, trg_pred, prem_arg, sub_arg):
+def search_axioms_from_db(src_pred, trg_pred, sub_arg_list, prem_arg_list, allarg):
     import sqlite3
     coq_axiom = ""
+    sub_arg = " ".join(sub_arg_list)
+    prem_arg = " ".join(prem_arg_list)
     con = sqlite3.connect('./sick_phrase.sqlite3')
     cur = con.cursor()
     #1. search for premise-subgoal relations from sqlite
-    df = pd.io.sql.read_sql_query('select * from {table} where premise = \"{trg_pred}\" and subgoal = \"{src_pred}\"'\
+    df = pd.io.sql.read_sql_query('select * from {table} where premise = \"{src_pred}\" and subgoal = \"{trg_pred}\"'\
         .format(table='axioms', trg_pred=trg_pred, src_pred=src_pred), con)
     
-    #select axioms from argument information if there are multiple candidate axioms in database
-    #But there are many duplicates in database for now. Temporarily, return the first record as the best candidate axiom
+    #select axioms from argument information if there are multiple candidate axioms in database.
+    #But there are many duplicates in database for now. 
+    #Temporarily, return the first record as the best candidate axiom
     if not df.empty:
-        premise = df.loc[0, ["premise"]].values[0]
-        subgoal = df.loc[0, ["subgoal"]].values[0]
-        prem_arg = df.loc[0, ["prem_arg"]].values[0]
-        sub_arg = df.loc[0, ["sub_arg"]].values[0]
-        kind = df.loc[0, ["kind"]].values[0]
-        allarg = df.loc[0, ["allarg"]].values[0]
+        db_premise = df.loc[0, ["premise"]].values[0]
+        db_subgoal = df.loc[0, ["subgoal"]].values[0]
+        db_prem_arg = df.loc[0, ["prem_arg"]].values[0]
+        db_sub_arg = df.loc[0, ["sub_arg"]].values[0]
+        db_kind = df.loc[0, ["kind"]].values[0]
+        db_allarg = df.loc[0, ["allarg"]].values[0]
         coq_axiom = "Axiom ax_{0}_{1}_{2} : forall {3}, _{1} {4} -> _{2} {5}.".format(
-                        kind,
-                        premise,
-                        subgoal,
+                        db_kind,
+                        db_premise,
+                        db_subgoal,
                         allarg,
                         prem_arg,
                         sub_arg)
     else:
         #2. if no record is found, search for subgoal-premise relations from sqlite again
-        df2 = pd.io.sql.read_sql_query('select * from {table} where premise = \"{src_pred}\" and subgoal = \"{trg_pred}\"'\
+        df2 = pd.io.sql.read_sql_query('select * from {table} where premise = \"{trg_pred}\" and subgoal = \"{src_pred}\"'\
              .format(table='axioms', trg_pred=trg_pred, src_pred=src_pred), con)
         if not df2.empty:
-            premise = df2.loc[0, ["premise"]].values[0]
-            subgoal = df2.loc[0, ["subgoal"]].values[0]
-            prem_arg = df2.loc[0, ["prem_arg"]].values[0]
-            sub_arg = df2.loc[0, ["sub_arg"]].values[0]
-            kind = df2.loc[0, ["kind"]].values[0]
-            allarg = df2.loc[0, ["allarg"]].values[0]
+            db_subgoal = df2.loc[0, ["premise"]].values[0]
+            db_premise = df2.loc[0, ["subgoal"]].values[0]
+            db_sub_arg = df2.loc[0, ["prem_arg"]].values[0]
+            db_prem_arg = df2.loc[0, ["sub_arg"]].values[0]
+            db_kind = df2.loc[0, ["kind"]].values[0]
+            db_allarg = df2.loc[0, ["allarg"]].values[0]
             coq_axiom = "Axiom ax_{0}_{1}_{2} : forall {3}, _{1} {4} -> _{2} {5}.".format(
-                            kind,
-                            premise,
-                            subgoal,
+                            db_kind,
+                            db_premise,
+                            db_subgoal,
                             allarg,
                             prem_arg,
                             sub_arg)
@@ -259,9 +265,8 @@ def is_theorem_almost_defined(output_lines):
     subgoalflg = 0
     if len(conclusions) > 0:
         for conclusion in conclusions:
-            if not "False" in conclusion:
-                if not "=" in conclusion:
-                    subgoalflg = 1
+            if not "=" in conclusion:
+                subgoalflg = 1
             if "No more subgoals" in conclusion:
                 return True
     if subgoalflg == 1:
