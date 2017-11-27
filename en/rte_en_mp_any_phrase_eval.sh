@@ -235,7 +235,7 @@ function parse_easysrl() {
 function lemmatize() {
     # apply easyccg's lemmatizer to input file
     input_file=$1
-    lemmatized=`mktemp -t tmp`
+    lemmatized=`mktemp -t tmpXXX`
     cat $input_file | java -cp ${easyccg_dir}/easyccg.jar \
         uk.ac.ed.easyccg.lemmatizer.MorphaStemmer \
         > $lemmatized \
@@ -263,7 +263,7 @@ function parse_depccg() {
         --ifmt "%w|%l|%p \n" \
         --ofmt "%w|%l|%p|%n \n" \
         2> /dev/null | \
-    python2 ${depccg_dir}/src/run.py \
+    python ${depccg_dir}/src/run.py \
         ${depccg_dir}/models/tri_headfirst \
         en \
         --input-format POSandNERtagged \
