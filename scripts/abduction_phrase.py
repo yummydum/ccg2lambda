@@ -275,7 +275,7 @@ def get_premises_that_partially_match_conclusion_args(premises, conclusion):
         #print('Conclusion args: ' + str(conclusion_args) +
         #              '\nPremise args: ' + str(premise_args), file=sys.stderr)
         #if tree_contains(premise_args, conclusion_args):
-        if premise_args is None or "H :" in premise_line or "exists" in premise_line or "=" in premise_line or "forall" in premise_line or "/\\" in premise_line:
+        if premise_args is None or "exists" in premise_line or "=" in premise_line or "forall" in premise_line or "/\\" in premise_line:
             # ignore relation premises temporarily
             continue
         else:
