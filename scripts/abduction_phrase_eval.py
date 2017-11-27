@@ -51,20 +51,20 @@ def TryPhraseAbduction(coq_scripts):
     axioms = set()
     direct_proof_scripts, reverse_proof_scripts = [], []
     inference_result_str, all_scripts = "unknown", []
-    while inference_result_str == "unknown":
+    while True:
         #entailment proof
         inference_result_str, direct_proof_scripts, new_direct_axioms = \
             try_phrase_abduction(direct_proof_script,
                         previous_axioms=axioms, expected='yes')
         current_axioms = axioms.union(new_direct_axioms)
-        if inference_result_str == 'unknown':
+        if not inference_result_str == 'no':
             #contradiction proof
             inference_result_str, reverse_proof_scripts, new_reverse_axioms = \
                 try_phrase_abduction(reverse_proof_script,
                               previous_axioms=axioms, expected='no')
             current_axioms = axioms.union(new_reverse_axioms)
         all_scripts = direct_proof_scripts + reverse_proof_scripts
-        if len(axioms) == len(current_axioms):
+        if len(axioms) == len(current_axioms) or inference_result_str != 'unknown':
             break
         axioms = current_axioms
     return inference_result_str, all_scripts
@@ -84,13 +84,13 @@ def try_phrase_abduction(coq_script, previous_axioms=set(), expected='yes'):
         return expected, [new_coq_script], previous_axioms
     premise_lines = get_premise_lines(output_lines)
     #for phrase extraction, check all relations between premise_lines and conclusions
-    conclusion = get_conclusion_lines(output_lines)
-    if not premise_lines or not conclusion:
+    conclusions = get_conclusion_lines(output_lines)
+    if not premise_lines or not conclusions:
         failure_log = {"type error": has_type_error(output_lines),
                        "open formula": has_open_formula(output_lines)}
         print(json.dumps(failure_log), file=sys.stderr)
         return 'unknown', [], previous_axioms
-    axioms = make_phrase_axioms(premise_lines, conclusion, output_lines, expected)
+    axioms = make_phrase_axioms(premise_lines, conclusions, output_lines, expected)
     #axioms = filter_wrong_axioms(axioms, coq_script) temporarily
     axioms = axioms.union(previous_axioms)
     new_coq_script = insert_axioms_in_coq_script(axioms, coq_script)
@@ -106,9 +106,9 @@ def make_phrase_axioms(premises, conclusions, coq_output_lines=None, expected='y
     #check premises and sub-goals, search for their relations from sqlite, select axioms
     axioms = set()
     for conclusion in conclusions:
-        matching_premises = get_premises_that_partially_match_conclusion_args(premises, conclusion)
+        matching_premises, conclusion = get_premises_that_partially_match_conclusion_args(premises, conclusion)
         premise_preds = [premise.split()[2] for premise in matching_premises]
-        pred_args = get_predicate_case_arguments(premises, conclusion)
+        pred_args = get_predicate_case_arguments(matching_premises, conclusion)
         axioms.update(make_phrase_axioms_from_premises_and_conclusions(premise_preds, conclusion, pred_args, expected))
         if not axioms:
             failure_log = make_failure_log(
@@ -131,6 +131,9 @@ def get_conclusion_lines(coq_output_lines):
         if re.search('Toplevel', line):
             return conclusion_lines
         elif line == '':
+            continue
+        elif '=' in line:
+            #skip relational sub-goals
             continue
         elif re.search("No more subgoals", line):
             conclusion_lines.append(line)
@@ -285,24 +288,23 @@ def get_premises_that_partially_match_conclusion_args(premises, conclusion):
     to do: how to exclude such an premise perfectly
     """
     candidate_premises = []
-    conclusion = re.sub(r'\?([0-9]+)', r'?x\1', conclusion)
+    conclusion = re.sub(r'\?([0-9]+)', r'x\1', conclusion)
     conclusion_args = get_tree_pred_args(conclusion, is_conclusion=True)
     if conclusion_args is None:
-        return candidate_premises
+        return candidate_premises, conclusion
     for premise_line in premises:
         # Convert anonymous variables of the form ?345 into ?x345.
-        premise_line = re.sub(r'\?([0-9]+)', r'?x\1', premise_line)
+        premise_line = re.sub(r'\?([0-9]+)', r'x\1', premise_line)
         premise_args = get_tree_pred_args(premise_line)
         #print('Conclusion args: ' + str(conclusion_args) +
         #              '\nPremise args: ' + str(premise_args), file=sys.stderr)
         #if tree_contains(premise_args, conclusion_args):
-        if premise_args is None or "H :" in premise_line or "exists" in premise_line or "=" in premise_line or "forall" in premise_line or "/\\" in premise_line:
+        if premise_args is None or "exists" in premise_line or "=" in premise_line or "forall" in premise_line or "/\\" in premise_line:
             # ignore relation premises temporarily
             continue
         else:
             candidate_premises.append(premise_line)
-    #print(candidate_premises, file=sys.stderr)
-    return candidate_premises
+    return candidate_premises, conclusion
 
 def get_tree_pred_args_ex(line, is_conclusion=False):
     """
@@ -429,7 +431,7 @@ def get_predicate_case_arguments(premises, conclusion):
     pred_args_list = []
     for t in pred_trees:
         pred = t.label()
-        #if args have case information, extract the pair of case and variables in $args
+        #if args have case information, extract the pair of case and variables in args
         #ex. extract Subj x1 as argas in Tree('_lady', [Tree('Subj', ['x1'])])
         #args = t.leaves()
         args = []
