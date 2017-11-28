@@ -357,7 +357,7 @@ def insert_axioms_in_coq_script(axioms, coq_script):
 
 
 def try_abductions(coq_scripts):
-    assert len(coq_scripts) == 2
+    #assert len(coq_scripts) == 2
     direct_proof_script = coq_scripts[0]
     reverse_proof_script = coq_scripts[1]
     axioms = set()
