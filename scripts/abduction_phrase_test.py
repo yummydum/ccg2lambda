@@ -148,36 +148,69 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             '_barrier ?6027',
             '_over x5 ?6027']
         expected_axioms = set([
-            'Axiom ax_phrase_leap_barrier : forall x0 y0, _leap x0 -> _barrier y0.',
-            'Axiom ax_phrase_leap_over : forall x0 y0, _leap x0 -> _over x0 y0.'])
+            'Axiom ax_ex_phrase_leap_barrier : forall x0 y0, _leap x0 -> _barrier y0.',
+            'Axiom ax_ex_phrase_leap_over : forall x0 y0, _leap x0 -> _over x0 y0.'])
         axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
         self.assertEqual(expected_axioms, axioms,
             msg="{0} vs. {1}".format(expected_axioms, axioms))
 
-    #def test_snowboard_future_work(self):
+    def test_snowboard_future_work(self):
         #sick_trial_6932 (Future Work)
         #The snowboarder is doing a flip over a mound of snow.
         #Somebody is jumping in the air on a board.
         #There is no argument sharing with sub-goals containing existential variables
-        #premises = [
-        #    'H1 : _do x1',
-        #    'H2 : _snow x4',
-        #    'H3 : _mound x4',
-        #    'H4 : _over x3 x4',
-        #    'H5 : _flip (Subj x3)',
-        #    'H6 : Subj x3 = Acc x1',
-        #    'H7 : _snowboarder (Subj x1)']
-        #conclusions = [
-        #    '_jump ?2675',
-        #    '_air ?2953',
-        #    '_in ?2675 ?2953',
-        #    '_board ?3186',
-        #    '_on ?2675 ?3186']
-        #expected_axioms = set([
-        #    'Axiom ax_phrase_do_jump : forall x0 y0, _do x0 -> _jump y0.'])
-        #axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
-        #self.assertEqual(expected_axioms, axioms,
-        #    msg="{0} vs. {1}".format(expected_axioms, axioms))
+        #combine ngram or knowledge base information in searching for related premises
+        #in this case, two sub-goal phrases "jump-in-air" and "jump-on-board" are created
+        #next, we can detect the sub-goal "board" is related to the premise "snowboarder" using ngram similarity
+        #lastly, we may detect the sub-goal "air" is related to the premise "snow" using WordNet
+        premises = [
+            'H1 : _do x1',
+            'H2 : _snow x4',
+            'H3 : _mound x4',
+            'H4 : _over x3 x4',
+            'H5 : _flip (Subj x3)',
+            'H6 : Subj x3 = Acc x1',
+            'H7 : _snowboarder (Subj x1)']
+        conclusions = [
+            '_jump ?2675',
+            '_air ?2953',
+            '_in ?2675 ?2953',
+            '_board ?3186',
+            '_on ?2675 ?3186']
+        expected_axioms = set([
+            'Axiom ax_ex_phrase_do_jump : forall x0 y0, _do x0 -> _jump y0.',
+            'Axiom ax_ex_phrase_snowboarder_on : forall x0 y0 y1, _snowboarder x0 -> _on y0 y1.',
+            'Axiom ax_ex_phrase_snowboarder_board : forall x0 y1, _snowboarder x0 -> _board y1.',
+            'Axiom ax_ex_phrase_snow_in : forall x4 y0 y2, _snow x4 -> _in y0 y2.',
+            'Axiom ax_ex_phrase_snow_air : forall x4 y2, _snow x4 -> _air y2.'
+            ])
+        axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
+        self.assertEqual(expected_axioms, axioms,
+            msg="{0} vs. {1}".format(expected_axioms, axioms))
+
+    def test_walk(self):
+        #sick_train_410 
+        #A group of scouts are hiking through the grass.
+        #Some people are walking.
+        #consider case information in searching for the premises only when a sub-goal also contains case information
+        #in this case, solve exiential variable ?1111 by searching for the premise that relates to the sub-goal "_people"
+        #then, "_scout" and "_people" have the same case "Subj" and ?1111 can be replaced as x0
+        #next, we search for the premise that relates to "_walk x0", and the the premise "_hike x0" can be found
+        premises = [
+            'H1 : _hike x0',
+            'H2 : _through x0 x1',
+            'H3 : _grass x1',
+            'H4 : _scout (Subj x0)']
+        conclusions = [
+            '_people (Subj ?1111)',
+            '_walk ?1111']
+        expected_axioms = set([
+            'Axiom ax_ex_phrase_scout_people : forall x0 y0, _scout (Subj x0) -> _people (Subj y0).',
+            'Axiom ax_ex_phrase_hike_walk : forall x0 y0 y1, _snowboarder x0 -> _on y0 y1.'
+            ])
+        axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
+        self.assertEqual(expected_axioms, axioms,
+            msg="{0} vs. {1}".format(expected_axioms, axioms))
 
 
 if __name__ == '__main__':
