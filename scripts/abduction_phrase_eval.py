@@ -57,7 +57,7 @@ def TryPhraseAbduction(coq_scripts):
             try_phrase_abduction(direct_proof_script,
                         previous_axioms=axioms, expected='yes')
         current_axioms = axioms.union(new_direct_axioms)
-        if not inference_result_str == 'no':
+        if inference_result_str == 'unknown':
             #contradiction proof
             inference_result_str, reverse_proof_scripts, new_reverse_axioms = \
                 try_phrase_abduction(reverse_proof_script,
@@ -123,6 +123,7 @@ def make_phrase_axioms_from_premises_and_conclusions(premise_preds, conclusion_p
     return axioms
 
 def get_conclusion_lines(coq_output_lines):
+    print(coq_output_lines, file=sys.stderr)
     conclusion_lines = []
     line_index_last_conclusion_sep = find_final_conclusion_sep_line_index(coq_output_lines)
     if not line_index_last_conclusion_sep:

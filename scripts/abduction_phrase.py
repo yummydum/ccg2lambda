@@ -162,7 +162,12 @@ def get_phrases(premise_preds, conclusion_pred, pred_args, expected):
     trg_pred = denormalize_token(conclusion_pred)
 
     dist = []
+    copyflg = 0
     for src_pred in src_preds:
+        if src_pred == trg_pred:
+            #the same premise can be found(copy)
+            copyflg = 1
+            break
         wordnetsim = calc_wordnetsim(src_pred, trg_pred)
         ngramsim = calc_ngramsim(src_pred, trg_pred)
         argumentsim = calc_argumentsim(src_pred, trg_pred, pred_args)
@@ -172,6 +177,12 @@ def get_phrases(premise_preds, conclusion_pred, pred_args, expected):
         # w_1+w_2+w_3 = 1
         # 0 < wordnetsim < 1, 0 < ngramsim < 1, 0 < argumentsim < 1,
         dist.append(distance.cityblock([1, 1, 1], [wordnetsim, ngramsim, argumentsim]))
+    if copyflg == 1:
+        axiom = 'Axiom ax_copy_{0} : forall x, _{0} x.'\
+        .format(trg_pred)
+        axioms.append(axiom)
+        return list(set(axioms))
+
     mindist = dist.index(min(dist))
 
     best_src_pred = src_preds[mindist]
