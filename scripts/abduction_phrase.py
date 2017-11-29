@@ -338,6 +338,9 @@ def get_pred_from_coq_line(line, is_conclusion=False):
     raise(ValueError("Strange coq line: {0}".format(line)))
 
 def make_phrases_from_premises_and_conclusions_ex(premises, conclusions):
+    covered_conclusions = set()
+    axioms = set()
+    phrase_pairs = []
     premises = [p for p in premises if get_pred_from_coq_line(p).startswith('_')]
 
     p_pred_args = {}
@@ -370,13 +373,30 @@ def make_phrases_from_premises_and_conclusions_ex(premises, conclusions):
             if any(a in ta for a in args for ta in targs):
                 c_args_preds[targs].update(preds)
 
+    #create axioms about sub-goals with existential variables containing case information
+    case_c_preds = [c for c, c_args in c_pred_args.items() if re.search("\?", str(c_args)) and contains_case(str(c_args)) and len(c_args[0]) == 1]
+    for case_c_pred in case_c_preds:
+        case_c_arg = c_pred_args[case_c_pred][0][0]
+        case_c_arg = re.sub(r'\?([0-9]+)', r'x\1', case_c_arg)
+        case = re.search(r'([A-Z][a-z][a-z][a-z]?)', case_c_arg).group(1)
+        pat = re.compile(case)
+        for p_pred, p_args in p_pred_args.items():
+            if re.search(pat, p_args[0]):
+                #create axioms with premises which have the same case 
+                axiom = 'Axiom ax_ex_phrase{0}{1} : forall {2} {3}, {0} {2} -> {1} {3}.'.format(
+                        p_pred,
+                        case_c_pred,
+                        "x0",
+                        "y0")
+                axioms.add(axiom)
+                #covered_conclusions.add(p)
+
+
+    #create axioms about sub-goals without case information
     exclude_preds_in_conclusion = {
         get_pred_from_coq_line(l, is_conclusion=True) \
             for l in conclusions if not l.startswith('_') and contains_case(l)}
 
-    covered_conclusions = set()
-    axioms = set()
-    phrase_pairs = []
     for args, c_preds in sorted(c_args_preds.items(), key=lambda x: len(x[0]), reverse=True):
         c_preds = sorted([
             p for p in c_preds if p.startswith('_') and p not in exclude_preds_in_conclusion])
@@ -386,9 +406,10 @@ def make_phrases_from_premises_and_conclusions_ex(premises, conclusions):
             premise_preds = sorted([p for p in premise_preds if not contains_case(p)])
             if premise_preds:
                 phrase_pairs.append((premise_preds, c_preds)) # Saved phrase pairs for Yanaka-san.
-                premise_pred = premise_preds[0]
-                for p in c_preds:
-                    if p not in covered_conclusions:
+                for premise_pred in premise_preds:
+                #premise_pred = premise_preds[0] #not only the first premise, but all premises are selected
+                    for p in c_preds:
+                        #if p not in covered_conclusions:
                         c_num_args = max(len(cargs) for cargs in c_pred_args[p])
                         p_num_args = len(p_pred_args[premise_pred])
                         axiom = 'Axiom ax_ex_phrase{0}{1} : forall {2} {3}, {0} {2} -> {1} {3}.'.format(
