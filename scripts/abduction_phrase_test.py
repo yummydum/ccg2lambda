@@ -40,7 +40,7 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             'Axiom ax_ex_phrase_cut_piece : forall x0 y0, _cut x0 -> _piece y0.'])
         axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
         self.assertEqual(expected_axioms, axioms,
-            msg="{0} vs. {1}".format(expected_axioms, axioms))
+            msg="\n{0} vs. {1}".format(expected_axioms, axioms))
 
     def test_protective_gear(self):
         premises = [
@@ -67,7 +67,7 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             'Axiom ax_ex_phrase_gear_for : forall x0 y0 y1, _gear x0 -> _for y0 y1.'])
         axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
         self.assertEqual(expected_axioms, axioms,
-            msg="{0} vs. {1}".format(expected_axioms, axioms))
+            msg="\n{0} vs. {1}".format(expected_axioms, axioms))
 
     def test_sidewalk(self):
         premises = [
@@ -85,7 +85,7 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
         # from pudb import set_trace; set_trace()
         axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
         self.assertEqual(expected_axioms, axioms,
-            msg="{0} vs. {1}".format(expected_axioms, axioms))
+            msg="\n{0} vs. {1}".format(expected_axioms, axioms))
 
     def test_water_scooter(self):
         #sick_trial_3373 
@@ -100,10 +100,11 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             '_for ?2914 (Acc x1)',
             'Subj ?2914 = Acc x1']
         expected_axioms = set([
-            'Axiom ax_ex_phrase_scooter_for : forall x0 y0, _scooter x0 -> _for y0 x0.'])
+            'Axiom ax_ex_phrase_scooter_for : forall x0 y0 y1, _scooter x0 -> _for y0 y1.'])
+        # from pudb import set_trace; set_trace()
         axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
         self.assertEqual(expected_axioms, axioms,
-            msg="{0} vs. {1}".format(expected_axioms, axioms))
+            msg="\n{0} vs. {1}".format(expected_axioms, axioms))
 
     def test_sewing(self):
         #sick_trial_2166
@@ -126,7 +127,7 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             'Axiom ax_ex_phrase_machine_sewing : forall x0 y1, _machine x0 -> _sewing y1.'])
         axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
         self.assertEqual(expected_axioms, axioms,
-            msg="{0} vs. {1}".format(expected_axioms, axioms))
+            msg="\n{0} vs. {1}".format(expected_axioms, axioms))
 
     def test_leap(self):
         #sick_trial_6634
@@ -152,7 +153,7 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             'Axiom ax_ex_phrase_leap_over : forall x0 y0, _leap x0 -> _over x0 y0.'])
         axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
         self.assertEqual(expected_axioms, axioms,
-            msg="{0} vs. {1}".format(expected_axioms, axioms))
+            msg="\n{0} vs. {1}".format(expected_axioms, axioms))
 
     def test_snowboard_future_work(self):
         #sick_trial_6932 (Future Work)
@@ -186,7 +187,7 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             ])
         axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
         self.assertEqual(expected_axioms, axioms,
-            msg="{0} vs. {1}".format(expected_axioms, axioms))
+            msg="\n{0} vs. {1}".format(expected_axioms, axioms))
 
     def test_walk(self):
         #sick_train_410 
@@ -210,7 +211,7 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             ])
         axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
         self.assertEqual(expected_axioms, axioms,
-            msg="{0} vs. {1}".format(expected_axioms, axioms))
+            msg="\n{0} vs. {1}".format(expected_axioms, axioms))
 
 
 if __name__ == '__main__':
