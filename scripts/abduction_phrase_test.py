@@ -208,7 +208,7 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             '_walk ?1111']
         expected_axioms = set([
             'Axiom ax_ex_phrase_scout_people : forall x0 y0, _scout (Subj x0) -> _people (Subj y0).',
-            'Axiom ax_ex_phrase_hike_walk : forall x0 y0 y1, _snowboarder x0 -> _on y0 y1.'
+            'Axiom ax_ex_phrase_hike_walk : forall x0 y0, _hike x0 -> _walk y0.'
             ])
         axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
         self.assertEqual(expected_axioms, axioms,
