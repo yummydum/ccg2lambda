@@ -295,12 +295,19 @@ def get_tree_pred_args_ex(line, is_conclusion=False):
     tree_args = None
     if not is_conclusion:
         line = ' '.join(line.split()[2:])
-    # Transform a line 'Subj ?2914 = Acc x1' into '(= (Subj ?2914) (Acc x1))'
-    line = re.sub(r'(.+) (.+) = (.+) (.+)', r'(= (\1 \2) (\3 \4))', line)
+    # Transform a line 'Subj ?2914 = Acc x1' into '= (Subj ?2914) (Acc x1)'
+    line = re.sub(r'(.+) (.+) = (.+) (.+)', r'= (\1 \2) (\3 \4)', line)
+    # Transform a line '?2914 = Acc x1' into '= ?2914 (Acc x1)'
+    line = re.sub(r'(.+) = (.+) (.+)', r'= \1 (\2 \3)', line)
+    # Transform a line 'Subj ?2914 = x1' into '= (Subj ?2914) x1'
+    line = re.sub(r'(.+) (.+) = (.+)', r'= (\1 \2) \3', line)
+    # Transform a line 'Subj ?2914 = x1' into '= (Subj ?2914) x1'
+    line = re.sub(r'(.+) = (.+)', r'= \1 \2', line)
     tree_args = parse_coq_line(line)
     if tree_args is None or is_string(tree_args) or len(tree_args) < 1:
         return None
     return [str(child) for child in tree_args if str(child) != '=']
+    # return list(set([str(child) for child in tree_args if str(child) != '='] + tree_args.leaves()))
 
 def contains_case(coq_line):
     """
@@ -315,19 +322,98 @@ def contains_case(coq_line):
         return True
     return False
 
+def get_pred_from_coq_line(line, is_conclusion=False):
+    # Transform a line 'Subj ?2914 = Acc x1' into '= (Subj ?2914) (Acc x1)'
+    line = re.sub(r'(.+) (.+) = (.+) (.+)', r'= (\1 \2) (\3 \4)', line)
+    # Transform a line '?2914 = Acc x1' into '= ?2914 (Acc x1)'
+    line = re.sub(r'(.+) = (.+) (.+)', r'= \1 (\2 \3)', line)
+    # Transform a line 'Subj ?2914 = x1' into '= (Subj ?2914) x1'
+    line = re.sub(r'(.+) (.+) = (.+)', r'= (\1 \2) \3', line)
+    # Transform a line 'Subj ?2914 = x1' into '= (Subj ?2914) x1'
+    line = re.sub(r'(.+) = (.+)', r'= \1 \2', line)
+    if is_conclusion:
+        return line.split()[0]
+    else:
+        return line.split()[2]
+    raise(ValueError("Strange coq line: {0}".format(line)))
+
 def make_phrases_from_premises_and_conclusions_ex(premises, conclusions):
-    premises = [p for p in premises if p.split()[2].startswith('_')]
+    premises = [p for p in premises if get_pred_from_coq_line(p).startswith('_')]
 
     p_pred_args = {}
     for p in premises:
-        predicate = p.split()[2]
+        predicate = get_pred_from_coq_line(p, is_conclusion=False)
+        args = get_tree_pred_args_ex(p, is_conclusion=False)
+        if args is not None:
+            p_pred_args[predicate] = args
+
+    c_pred_args = defaultdict(list)
+    for c in conclusions:
+        predicate = get_pred_from_coq_line(c, is_conclusion=True)
+        args = get_tree_pred_args_ex(c, is_conclusion=True)
+        if args is not None:
+            c_pred_args[predicate].append(args) # List of lists of args.
+
+    # Compute relations between arguments as frozensets.
+    c_args_preds = defaultdict(set)
+    for pred, args_list in c_pred_args.items():
+        for args in args_list:
+            for arg in args:
+                c_args_preds[frozenset([arg])].add(pred)
+            c_args_preds[frozenset(args)].add(pred)
+    # from pudb import set_trace; set_trace()
+    for args, preds in sorted(c_args_preds.items(), key=lambda x: len(x[0])):
+        for targs, _ in sorted(c_args_preds.items(), key=lambda x: len(x[0])):
+            # if args.intersection(targs):
+            # E.g. if args is {'?4844'} and targs is {'(Acc ?4844)', 'x1'},
+            # then we merge the predicates associated to these arguments.
+            if any(a in ta for a in args for ta in targs):
+                c_args_preds[targs].update(preds)
+
+    exclude_preds_in_conclusion = {
+        get_pred_from_coq_line(l, is_conclusion=True) \
+            for l in conclusions if not l.startswith('_') and contains_case(l)}
+
+    covered_conclusions = set()
+    axioms = set()
+    phrase_pairs = []
+    for args, c_preds in sorted(c_args_preds.items(), key=lambda x: len(x[0]), reverse=True):
+        c_preds = sorted([
+            p for p in c_preds if p.startswith('_') and p not in exclude_preds_in_conclusion])
+        if len(args) > 1:
+            premise_preds = [
+                p for p, p_args in p_pred_args.items() if set(p_args).issubset(args)]
+            premise_preds = sorted([p for p in premise_preds if not contains_case(p)])
+            if premise_preds:
+                phrase_pairs.append((premise_preds, c_preds)) # Saved phrase pairs for Yanaka-san.
+                premise_pred = premise_preds[0]
+                for p in c_preds:
+                    if p not in covered_conclusions:
+                        c_num_args = max(len(cargs) for cargs in c_pred_args[p])
+                        p_num_args = len(p_pred_args[premise_pred])
+                        axiom = 'Axiom ax_ex_phrase{0}{1} : forall {2} {3}, {0} {2} -> {1} {3}.'.format(
+                            premise_pred,
+                            p,
+                            ' '.join('x' + str(i) for i in range(p_num_args)),
+                            ' '.join('y' + str(i) for i in range(c_num_args)))
+                        axioms.add(axiom)
+                        covered_conclusions.add(p)
+    # print(phrase_pairs) # this is a list of tuples of lists.
+    return axioms
+
+def make_phrases_from_premises_and_conclusions_ex_(premises, conclusions):
+    premises = [p for p in premises if get_pred_from_coq_line(p).startswith('_')]
+
+    p_pred_args = {}
+    for p in premises:
+        predicate = get_pred_from_coq_line(p, is_conclusion=False)
         args = get_tree_pred_args_ex(p, is_conclusion=False)
         if args is not None:
             p_pred_args[predicate] = args
 
     c_pred_args = {}
     for c in conclusions:
-        predicate = c.split()[0]
+        predicate = get_pred_from_coq_line(c, is_conclusion=True)
         args = get_tree_pred_args_ex(c, is_conclusion=True)
         if args is not None:
             c_pred_args[predicate] = args
@@ -341,11 +427,15 @@ def make_phrases_from_premises_and_conclusions_ex(premises, conclusions):
     # from pudb import set_trace; set_trace()
     for args, preds in sorted(c_args_preds.items(), key=lambda x: len(x[0])):
         for targs, _ in sorted(c_args_preds.items(), key=lambda x: len(x[0])):
-            if args.intersection(targs):
+            # if args.intersection(targs):
+            # E.g. if args is {'?4844'} and targs is {'(Acc ?4844)', 'x1'},
+            # then we merge the predicates associated to these arguments.
+            if any(a in ta for a in args for ta in targs):
                 c_args_preds[targs].update(preds)
 
     exclude_preds_in_conclusion = {
-        l.split()[0] for l in conclusions if not l.startswith('_') and contains_case(l)}
+        get_pred_from_coq_line(l, is_conclusion=True) \
+            for l in conclusions if not l.startswith('_') and contains_case(l)}
 
     covered_conclusions = set()
     axioms = set()

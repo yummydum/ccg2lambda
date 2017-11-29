@@ -65,6 +65,7 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             'Axiom ax_ex_phrase_gear_use : forall x0 y0, _gear x0 -> _use y0.',
             'Axiom ax_ex_phrase_gear_protection : forall x0 y0, _gear x0 -> _protection y0.',
             'Axiom ax_ex_phrase_gear_for : forall x0 y0 y1, _gear x0 -> _for y0 y1.'])
+        # from pudb import set_trace; set_trace()
         axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
         self.assertEqual(expected_axioms, axioms,
             msg="\n{0} vs. {1}".format(expected_axioms, axioms))
@@ -101,7 +102,6 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
             'Subj ?2914 = Acc x1']
         expected_axioms = set([
             'Axiom ax_ex_phrase_scooter_for : forall x0 y0 y1, _scooter x0 -> _for y0 y1.'])
-        # from pudb import set_trace; set_trace()
         axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
         self.assertEqual(expected_axioms, axioms,
             msg="\n{0} vs. {1}".format(expected_axioms, axioms))
@@ -124,7 +124,8 @@ class EstimateExistentialVariablesTestCase(unittest.TestCase):
         expected_axioms = set([
             'Axiom ax_ex_phrase_machine_make : forall x0 y0, _machine x0 -> _make y0.',
             'Axiom ax_ex_phrase_machine_for : forall x0 y0 y1, _machine x0 -> _for y0 y1.',
-            'Axiom ax_ex_phrase_machine_sewing : forall x0 y1, _machine x0 -> _sewing y1.'])
+            'Axiom ax_ex_phrase_machine_sewing : forall x0 y0, _machine x0 -> _sewing y0.'])
+        # from pudb import set_trace; set_trace()
         axioms = make_phrases_from_premises_and_conclusions_ex(premises, conclusions)
         self.assertEqual(expected_axioms, axioms,
             msg="\n{0} vs. {1}".format(expected_axioms, axioms))
