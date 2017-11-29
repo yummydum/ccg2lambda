@@ -150,6 +150,7 @@ def get_phrases(premise_preds, conclusion_pred, pred_args, expected):
     #evaluate phrase candidates based on multiple similarities: surface, external knowledge, argument matching
     #in some cases, considering argument matching only is better
     axiom, axioms = "", []
+    copyflg = 0
     src_preds = [denormalize_token(p) for p in premise_preds]
     if "False" in conclusion_pred or "=" in conclusion_pred:
         #skip relational subgoals
@@ -157,6 +158,10 @@ def get_phrases(premise_preds, conclusion_pred, pred_args, expected):
     conclusion_pred = conclusion_pred.split()[0]
     trg_pred = denormalize_token(conclusion_pred)
     for src_pred in src_preds:
+        if src_pred == trg_pred:
+            #the same premise can be found(copy)
+            copyflg = 1
+            break
         nor_src_pred = normalize_token(src_pred)
         allarg_list = list(set(pred_args[conclusion_pred] + pred_args[nor_src_pred]))
         allarg_list = check_case_from_list(allarg_list)
@@ -165,6 +170,10 @@ def get_phrases(premise_preds, conclusion_pred, pred_args, expected):
         #to do: select best axiom from premises(or make phrasal axiom coq_script)
         if axiom:
             axioms.append(axiom)
+    if copyflg == 1:
+        axiom = 'Axiom ax_copy_{0} : forall x, _{0} x.'\
+        .format(trg_pred)
+        axioms.append(axiom)
     print("premise_pred:{0}, conclusion_pred:{1}, pred_args:{2}, axiom:{3}".format(premise_preds, conclusion_pred, pred_args, axioms), file=sys.stderr)
     # to do: consider how to inject antonym axioms
 
