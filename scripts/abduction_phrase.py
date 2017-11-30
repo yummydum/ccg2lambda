@@ -348,11 +348,20 @@ def get_pred_from_coq_line(line, is_conclusion=False):
         return line.split()[2]
     raise(ValueError("Strange coq line: {0}".format(line)))
 
+def check_decomposed(line):
+    if line.startswith(':'):
+        return False
+    if re.search("forall", line):
+        return False
+    if re.search("exists", line):
+        return False
+    return True
+
 def make_phrases_from_premises_and_conclusions_ex(premises, conclusions):
     covered_conclusions = set()
     axioms = set()
     phrase_pairs = []
-    premises = [p for p in premises if get_pred_from_coq_line(p).startswith('_')]
+    premises = [p for p in premises if get_pred_from_coq_line(p).startswith('_') and check_decomposed(p)]
 
     p_pred_args = {}
     for p in premises:
