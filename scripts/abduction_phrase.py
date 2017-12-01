@@ -154,15 +154,14 @@ def get_phrases(premise_preds, conclusion_pred, pred_args, expected):
     #evaluate phrase candidates based on multiple similarities: surface, external knowledge, argument matching
     #in some cases, considering argument matching only is better
     axiom, axioms = "", []
+    dist = []
+    copyflg = 0
     src_preds = [denormalize_token(p) for p in premise_preds]
     if "False" in conclusion_pred or "=" in conclusion_pred:
         #skip relational subgoals
         return list(set(axioms))
     conclusion_pred = conclusion_pred.split()[0]
     trg_pred = denormalize_token(conclusion_pred)
-
-    dist = []
-    copyflg = 0
     for src_pred in src_preds:
         if src_pred == trg_pred:
             #the same premise can be found(copy)
@@ -439,7 +438,7 @@ def make_phrases_from_premises_and_conclusions_ex(premises, conclusions):
                             ' '.join('y' + str(i) for i in range(c_num_args)))
                         axioms.add(axiom)
                         covered_conclusions.add(p)
-    # print(phrase_pairs) # this is a list of tuples of lists.
+    print(axioms) # this is a list of tuples of lists.
     return axioms
 
 def make_phrases_from_premises_and_conclusions_ex_(premises, conclusions):
@@ -502,7 +501,7 @@ def make_phrases_from_premises_and_conclusions_ex_(premises, conclusions):
                             ' '.join('y' + str(i) for i in range(c_num_args)))
                         axioms.add(axiom)
                         covered_conclusions.add(p)
-    # print(phrase_pairs) # this is a list of tuples of lists.
+    #print(phrase_pairs) # this is a list of tuples of lists.
     return axioms
 
 def distinguish_normal_conclusions(conclusions):
