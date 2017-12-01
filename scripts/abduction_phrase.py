@@ -95,7 +95,7 @@ def try_phrase_abduction(coq_script, previous_axioms=set(), expected='yes'):
     axioms = make_phrase_axioms(premise_lines, conclusion, output_lines, expected)
     #axioms = filter_wrong_axioms(axioms, coq_script) temporarily
     axioms = axioms.union(previous_axioms)
-    new_coq_script = insert_axioms_in_coq_script(axioms, coq_script)
+    new_coq_script = insert_axioms_in_coq_script(axioms, coq_script_debug)
     process = Popen(
         new_coq_script,
         shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
