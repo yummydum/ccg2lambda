@@ -19,11 +19,12 @@ import json
 import glob
 import re
 import numpy as np
+import collections
 from collections import defaultdict
 from subprocess import Popen
 import subprocess
 import sys
-
+from abduction_tools import *
 # Initial Q-value
 #trial
 Q = np.zeros((101,500))
@@ -31,6 +32,8 @@ Q = np.zeros((101,500))
 LEARNING_COUNT = 100
 GAMMA = 0.8
 GOAL_STATE = 100
+pred2id = collections.defaultdict(lambda: len(pred2id))
+arg2id = collections.defaultdict(lambda: len(arg2id))
 
 class QLearning(object):
     def __init__(self):
@@ -177,10 +180,30 @@ def clean_args(args):
             newargs.append(re.sub("[\(\)]", '', arg))
     return newargs
 
+def get_conclusion_lines(coq_output_lines):
+    conclusion_lines = []
+    line_index_last_conclusion_sep = find_final_conclusion_sep_line_index(coq_output_lines)
+    if not line_index_last_conclusion_sep:
+        return None
+    for line in coq_output_lines[line_index_last_conclusion_sep+1:]:
+        if re.search('Toplevel', line):
+            return conclusion_lines
+        elif line == '':
+            continue
+        elif re.search("No more subgoals", line):
+            conclusion_lines.append(line)
+        elif re.search("subgoal", line):
+            continue
+        elif re.search('repeat nltac_base', line):
+            return conclusion_lines
+        else:
+            conclusion_lines.append(line)
+    return conclusion_lines
+
 def main():
     all_info = defaultdict(list)
     files = glob.glob("subgoal_results/sick_trial_*.err")
-    for file in files:
+    for file in files[0:10]:
         f = open(file,"r")
         filename = re.search("sick_(trial_[0-9]*)\.", file).group(1)
         #print(filename)
@@ -225,16 +248,26 @@ def main():
                 prem_arg = v[5][v[4].index(prem)]
                 sub_arg = v[7][v[6].index(subg)]
                 all_arg = extract_all_arg(prem_arg, sub_arg)
-                axiom_script = "Axiom ax{0}{1} : forall {2}, {0} {3} -> {1} {4}.\n"\
+                axiom = "Axiom ax{0}{1} : forall {2}, {0} {3} -> {1} {4}.\n"\
                 .format(prem,subg,all_arg,prem_arg,sub_arg)
-                axiom_script += "Hint Resolve ax{0}{1}.\n".format(prem,subg)
                 #attempt axiom injection
-                coq_script = v[8]+axiom_script
+                coq_script = insert_axioms_in_coq_script(set([axiom]), v[8])
                 process = Popen(
-                    new_coq_script,
+                    coq_script,
                     shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                 output_lines = [
-                    line.decode('utf-8').strip().split() for line in process.stdout.readlines()]
+                    line.decode('utf-8').strip() for line in process.stdout.readlines()]
+                conclusions = get_conclusion_lines(output_lines)
+                #print(output_lines)
+                if conclusions is None:
+                    print("subgoal removed!")
+                    #update the state
+                elif len(conclusions) < len(v[6]):
+                    print("subgoal removed!")
+                    #update the state
+                else:
+                    print("subgoal not removed")
+                    #update the state
 
 
 
