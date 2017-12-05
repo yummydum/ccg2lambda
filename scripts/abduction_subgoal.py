@@ -30,12 +30,15 @@ class AxiomsSubgoal(object):
 def extract_all_subgoals(coq_scripts):
     direct_proof_script = coq_scripts[0]
     reverse_proof_script = coq_scripts[1]
-    premises, subgoals = extract_subgoals(direct_proof_script)
-    neg_premises, neg_subgoals = extract_subgoals(reverse_proof_script)
+    premises, subgoals, coq_script_debug = extract_subgoals(direct_proof_script)
+    #neg_premises, neg_subgoals, neg_coq_script_debug = extract_subgoals(reverse_proof_script)
     log = {"prem": premises,
            "subg": subgoals,
-           "neg_prem": neg_premises,
-           "neg_subg": neg_subgoals}
+           #"neg_prem": neg_premises,
+           #"neg_subg": neg_subgoals,
+           "coq": coq_script_debug,
+           #"neg_coq": neg_coq_script_debug
+           }
     print(json.dumps(log), file=sys.stderr)
     return "unknown", []
 
@@ -54,7 +57,7 @@ def extract_subgoals(coq_script):
         failure_log = {"type error": has_type_error(output_lines),
                        "open formula": has_open_formula(output_lines)}
         print(json.dumps(failure_log), file=sys.stderr)
-    return premises, subgoals
+    return premises, subgoals, coq_script_debug
 
 def get_conclusion_lines(coq_output_lines):
     conclusion_lines = []
