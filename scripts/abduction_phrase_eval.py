@@ -208,24 +208,24 @@ def search_axioms_from_db(src_pred, trg_pred, sub_arg_list, prem_arg_list, allar
                         allarg,
                         prem_arg,
                         sub_arg)
-    else:
+    #else:
         #2. if no record is found, search for subgoal-premise relations from sqlite again
-        df2 = pd.io.sql.read_sql_query('select * from {table} where premise = \"{trg_pred}\" and subgoal = \"{src_pred}\"'\
-             .format(table='axioms', trg_pred=trg_pred, src_pred=src_pred), con)
-        if not df2.empty:
-            db_subgoal = df2.loc[0, ["premise"]].values[0]
-            db_premise = df2.loc[0, ["subgoal"]].values[0]
-            db_sub_arg = df2.loc[0, ["prem_arg"]].values[0]
-            db_prem_arg = df2.loc[0, ["sub_arg"]].values[0]
-            db_kind = df2.loc[0, ["kind"]].values[0]
-            db_allarg = df2.loc[0, ["allarg"]].values[0]
-            coq_axiom = "Axiom ax_{0}_{1}_{2} : forall {3}, _{1} {4} -> _{2} {5}.".format(
-                            db_kind,
-                            db_premise,
-                            db_subgoal,
-                            allarg,
-                            prem_arg,
-                            sub_arg)
+        #df2 = pd.io.sql.read_sql_query('select * from {table} where premise = \"{trg_pred}\" and subgoal = \"{src_pred}\"'\
+        #     .format(table='axioms', trg_pred=trg_pred, src_pred=src_pred), con)
+        #if not df2.empty:
+        #    db_subgoal = df2.loc[0, ["premise"]].values[0]
+        #    db_premise = df2.loc[0, ["subgoal"]].values[0]
+        #    db_sub_arg = df2.loc[0, ["prem_arg"]].values[0]
+        #    db_prem_arg = df2.loc[0, ["sub_arg"]].values[0]
+        #    db_kind = df2.loc[0, ["kind"]].values[0]
+        #    db_allarg = df2.loc[0, ["allarg"]].values[0]
+        #    coq_axiom = "Axiom ax_{0}_{1}_{2} : forall {3}, _{1} {4} -> _{2} {5}.".format(
+        #                    db_kind,
+        #                    db_premise,
+        #                    db_subgoal,
+        #                    allarg,
+        #                    prem_arg,
+        #                    sub_arg)
     print("coq_axioms_from_db: {0}, trg_pred: {1}, src_pred: {2}".format(coq_axiom, trg_pred, src_pred), file=sys.stderr)
     con.close()
     return coq_axiom
