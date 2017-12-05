@@ -94,7 +94,7 @@ def try_phrase_abduction(coq_script, previous_axioms=set(), expected='yes'):
     #axioms = filter_wrong_axioms(axioms, coq_script) temporarily
     axioms = axioms.union(previous_axioms)
     new_coq_script = insert_axioms_in_coq_script(axioms, coq_script_debug)
-    print(coq_script_debug, new_coq_script)
+    #print(coq_script_debug, new_coq_script)
     process = Popen(
         new_coq_script,
         shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -124,7 +124,7 @@ def make_phrase_axioms_from_premises_and_conclusions(premise_preds, conclusion_p
     return axioms
 
 def get_conclusion_lines(coq_output_lines):
-    print(coq_output_lines, file=sys.stderr)
+    #print(coq_output_lines, file=sys.stderr)
     conclusion_lines = []
     line_index_last_conclusion_sep = find_final_conclusion_sep_line_index(coq_output_lines)
     if not line_index_last_conclusion_sep:
@@ -283,7 +283,6 @@ def is_theorem_almost_defined(output_lines):
                 subgoalflg = 1
             if "No more subgoals" in conclusion:
                 return True
-    print("subgoalflg:{0}".format(subgoalflg))
     if subgoalflg == 1:
         return False
     else:
