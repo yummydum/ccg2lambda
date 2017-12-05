@@ -25,6 +25,7 @@ from subprocess import Popen
 import subprocess
 import sys
 from abduction_tools import *
+import random
 # Initial Q-value
 #trial
 Q = np.zeros((101,500))
@@ -253,7 +254,7 @@ def main():
                 prem_arg = v[5][v[4].index(prem)]
                 sub_arg = v[7][v[6].index(subg)]
                 all_arg = extract_all_arg(prem_arg, sub_arg)
-                axiom = "Axiom ax{0}{1} : forall {2}, {0} {3} -> {1} {4}.\n"\
+                axiom = "Axiom ax{0}{1} : forall {2}, {0} {3} -> {1} {4}."\
                 .format(prem,subg,all_arg,prem_arg,sub_arg)
                 #attempt axiom injection
                 coq_script = insert_axioms_in_coq_script(set([axiom]), v[8])
@@ -293,8 +294,67 @@ def main():
                         else:
                             #incorrect axiom
                             entail_axioms.remove(axiom)
-    for i in range(100000):
-	rk, rv = random.choice(all_info.items())
+    #random selection
+    for i in range(50000):
+        rk, rv = random.choice(list(all_info.items()))
+        prem_pred_vec = np.zeros(len(pred2id))
+        prem_pred_vec.put(rv[0], 1)
+        prem_arg_vec = np.zeros(len(arg2id))
+        prem_arg_vec.put(rv[1], 1)
+        subg_pred_vec = np.zeros(len(pred2id))
+        subg_pred_vec.put(rv[2], 1)
+        subg_arg_vec = np.zeros(len(arg2id))
+        subg_arg_vec.put(rv[3], 1)
+        #print(prem_pred_vec, prem_arg_vec, subg_pred_vec, subg_arg_vec)
+        #create premise vector and subgoal vector(state)
+        #feature: currently, wordID and argumentID(in trial dataset, dimension is about 1200)
+        prem_vec = np.concatenate([prem_pred_vec, prem_arg_vec], axis=0)
+        subg_vec = np.concatenate([subg_pred_vec, subg_arg_vec], axis=0)
+        for prem in rv[4]:
+            for subg in rv[6]:
+                prem_arg = rv[5][rv[4].index(prem)]
+                sub_arg = rv[7][rv[6].index(subg)]
+                all_arg = extract_all_arg(prem_arg, sub_arg)
+                axiom = "Axiom ax{0}{1} : forall {2}, {0} {3} -> {1} {4}."\
+                .format(prem,subg,all_arg,prem_arg,sub_arg)
+                #attempt axiom injection
+                coq_script = insert_axioms_in_coq_script(set([axiom]), rv[8])
+                process = Popen(
+                    coq_script,
+                    shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                output_lines = [
+                    line.decode('utf-8').strip() for line in process.stdout.readlines()]
+                conclusions = get_conclusion_lines(output_lines)
+                if rv[9] == "yes\n":
+                    if conclusions is None:
+                        if axiom not in entail_axioms:
+                            entail_axioms.append(axiom)
+                    elif len(conclusions) < len(rv[6]):
+                        if axiom not in entail_axioms:
+                            entail_axioms.append(axiom)
+                    else:
+                        if axiom not in entail_axioms:
+                            continue
+                        else:
+                            #incorrect axiom
+                            entail_axioms.remove(axiom)
+                elif rv[9] == "unknown\n":
+                    if conclusions is None:
+                        if axiom not in entail_axioms:
+                            continue
+                        else:
+                            #incorrect axiom
+                            entail_axioms.remove(axiom)
+                    elif len(conclusions) < len(rv[6]):
+                        if axiom not in unknown_axioms:
+                            #unknown axiom
+                            unknown_axioms.append(axiom)
+                    else:
+                        if axiom not in entail_axioms:
+                            continue
+                        else:
+                            #incorrect axiom
+                            entail_axioms.remove(axiom)
 
     w = open("subgoal_results/entail_axioms.txt", "w")
     for entail_axiom in entail_axioms:
