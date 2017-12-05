@@ -31,7 +31,7 @@ Q = np.zeros((101,500))
 
 LEARNING_COUNT = 100
 GAMMA = 0.8
-GOAL_STATE = 100
+GOAL_STATE = 50
 pred2id = collections.defaultdict(lambda: len(pred2id))
 arg2id = collections.defaultdict(lambda: len(arg2id))
 
@@ -66,7 +66,7 @@ class QLearning(object):
         return random.randint(0, R.shape[0] - 1)
       
     def _getPossibleActionsFromState(self, state):
-        if state < 0 or state >= R.shape[0]: sys.exit("invaid state: %d" % state)
+        if state == 0 or state >= R.shape[0]: sys.exit("invaid state: %d" % state)
         return list(np.where(np.array(R[state] != -1)))[0]
     
     def _getMaxQvalueFromStateAndPossibleActions(self, state, possible_actions):
@@ -153,14 +153,15 @@ def init_args(subg_args):
     ex2id = collections.defaultdict(lambda: len(ex2id))
     
     for subg_arg in subg_args:
-        str_arg = " ".join(subg_arg)
+        str_arg = ""
         #initialize existential variables
-        if re.search("\?", str_arg):
-            ex_arg = re.search("(\?[0-9]*)", str_arg).group(1)
-            pattern = "y"+str(ex2id[ex_arg])
-            str_arg = re.sub("(\?[0-9]*)", pattern, str_arg)
-        init_args.append(str_arg)
-            
+        for s_arg in subg_arg:
+            if re.search("\?", s_arg):
+                ex_arg = re.search("(\?[0-9]*)", s_arg).group(1)
+                pattern = "y"+str(ex2id[ex_arg])
+                s_arg = re.sub("(\?[0-9]*)", pattern, s_arg)
+            str_arg = str_arg + " " + s_arg
+        init_args.append(str_arg)  
     return init_args
 
 def extract_all_arg(prem_arg, sub_arg):
@@ -201,11 +202,16 @@ def get_conclusion_lines(coq_output_lines):
     return conclusion_lines
 
 def main():
+    entail_axioms = []
+    unknown_axioms = []
     all_info = defaultdict(list)
-    files = glob.glob("subgoal_results/sick_trial_*.err")
-    for file in files[0:10]:
-        f = open(file,"r")
-        filename = re.search("sick_(trial_[0-9]*)\.", file).group(1)
+    files = glob.glob("subgoal_results/*.err")
+    for file in files:
+        f = open(file, "r")
+        filename = re.search("(sick_trial_[0-9]*)\.", file).group(1)
+        g = open("plain/"+filename+".answer", "r")
+        gold = g.readline()
+        g.close()
         #print(filename)
         try:
             temp = {i : json.loads(line) for i, line in enumerate(f)}
@@ -226,6 +232,7 @@ def main():
                     all_info[filename].append(subg_preds)
                     all_info[filename].append(subg_args)
                     all_info[filename].append(coq_script)
+                    all_info[filename].append(gold)
         
     for k, v in all_info.items():     
         prem_pred_vec = np.zeros(len(pred2id))
@@ -241,8 +248,6 @@ def main():
         #feature: currently, wordID and argumentID(in trial dataset, dimension is about 1200)
         prem_vec = np.concatenate([prem_pred_vec, prem_arg_vec], axis=0)
         subg_vec = np.concatenate([subg_pred_vec, subg_arg_vec], axis=0)
-
-        #action
         for prem in v[4]:
             for subg in v[6]:
                 prem_arg = v[5][v[4].index(prem)]
@@ -258,20 +263,53 @@ def main():
                 output_lines = [
                     line.decode('utf-8').strip() for line in process.stdout.readlines()]
                 conclusions = get_conclusion_lines(output_lines)
-                #print(output_lines)
-                if conclusions is None:
-                    print("subgoal removed!")
-                    #update the state
-                elif len(conclusions) < len(v[6]):
-                    print("subgoal removed!")
-                    #update the state
-                else:
-                    print("subgoal not removed")
-                    #update the state
+                if v[9] == "yes\n":
+                    if conclusions is None:
+                        if axiom not in entail_axioms:
+                            entail_axioms.append(axiom)
+                    elif len(conclusions) < len(v[6]):
+                        if axiom not in entail_axioms:
+                            entail_axioms.append(axiom)
+                    else:
+                        if axiom not in entail_axioms:
+                            continue
+                        else:
+                            #incorrect axiom
+                            entail_axioms.remove(axiom)
+                elif v[9] == "unknown\n":
+                    if conclusions is None:
+                        if axiom not in entail_axioms:
+                            continue
+                        else:
+                            #incorrect axiom
+                            entail_axioms.remove(axiom)
+                    elif len(conclusions) < len(v[6]):
+                        if axiom not in unknown_axioms:
+                            #unknown axiom
+                            unknown_axioms.append(axiom)
+                    else:
+                        if axiom not in entail_axioms:
+                            continue
+                        else:
+                            #incorrect axiom
+                            entail_axioms.remove(axiom)
 
+    w = open("entail_axioms.txt", "w")
+    for entail_axiom in entail_axioms:
+        w.write(entail_axiom)
+    w.close()
+
+    x = open("unknown_axioms.txt", "w")
+    for unknown_axiom in unknown_axioms:
+        x.write(unknown_axiom)
+    x.close()
 
 
 
 
 if __name__ == '__main__':
     main()
+    #QL = QLearning()
+    #QL.learn()
+    #QL.dumpQvalue()
+    #QL.runGreedy(s)
