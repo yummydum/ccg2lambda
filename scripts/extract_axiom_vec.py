@@ -205,10 +205,10 @@ def main():
     entail_axioms = []
     unknown_axioms = []
     all_info = defaultdict(list)
-    files = glob.glob("subgoal_results/*.err")
+    files = glob.glob("subgoal_results/sick_*.err")
     for file in files:
         f = open(file, "r")
-        filename = re.search("(sick_trial_[0-9]*)\.", file).group(1)
+        filename = re.search("(sick_[a-z]*_[0-9]*)\.", file).group(1)
         g = open("plain/"+filename+".answer", "r")
         gold = g.readline()
         g.close()
@@ -293,13 +293,15 @@ def main():
                         else:
                             #incorrect axiom
                             entail_axioms.remove(axiom)
+    for i in range(100000):
+	rk, rv = random.choice(all_info.items())
 
-    w = open("entail_axioms.txt", "w")
+    w = open("subgoal_results/entail_axioms.txt", "w")
     for entail_axiom in entail_axioms:
         w.write(entail_axiom)
     w.close()
 
-    x = open("unknown_axioms.txt", "w")
+    x = open("subgoal_results/unknown_axioms.txt", "w")
     for unknown_axiom in unknown_axioms:
         x.write(unknown_axiom)
     x.close()
