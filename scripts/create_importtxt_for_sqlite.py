@@ -5,7 +5,7 @@
 
 import re
 
-f = open("./20171123phraseaxiom.txt", "r")
+f = open("./phraseaxiom.txt", "r")
 axioms = f.readlines()
 f.close()
 
@@ -25,6 +25,7 @@ for a in axioms:
     premise_arg = re.search("_([a-z0-9]+)\s([(xyzSubjAcc0-9)\s]+)", premise).group(2)
     premise_arg = premise_arg.strip()
     subgoal = forall_list[1]
+    #print(premise, subgoal)
     subgoal_pred = re.search("_([a-z0-9]+)", subgoal).group(1)
     subgoal_arg = re.search("_([a-z0-9]+)\s([(xyzSubjAcc0-9)\s]+)", subgoal).group(2)
     subgoal_arg = subgoal_arg.strip()
