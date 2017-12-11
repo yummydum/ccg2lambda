@@ -277,6 +277,8 @@ def is_theorem_almost_defined(output_lines):
     conclusions = get_conclusion_lines(output_lines)
     print("conclusion:{0}".format(conclusions), file=sys.stderr)
     subgoalflg = 0
+    if conclusions is None:
+        return False
     if len(conclusions) > 0:
         for conclusion in conclusions:
             if not "=" in conclusion:
