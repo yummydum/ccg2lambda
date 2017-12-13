@@ -66,7 +66,8 @@ def create_antonym_axioms(relations_to_pairs):
     if not antonyms:
         return axioms
     for t1, t2 in antonyms:
-        axiom = 'Axiom ax_{0}_{1}_{2} : forall x, _{1} x -> _{2} x -> False.'\
+        #axiom = 'Axiom ax_{0}_{1}_{2} : forall x, _{1} x -> _{2} x -> False.'\
+        axiom = 'Axiom ax_{0}_{1}_{2} : forall F x y, _{1} x -> _{2} y -> F (Subj x) -> F (Subj y)  -> False.'\
                 .format(relation, t1, t2)
         axioms.append(axiom)
     return axioms
