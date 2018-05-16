@@ -179,7 +179,7 @@ If you wish to reproduce our reported results, please follow the instructions be
 * [Experiments on JSeM at EMNLP 2016](ja/jsem.md)
 * [Experiments on SICK at EACL 2017](en/sick.md)
 * [Experiments on STS for SICK and MSRvid at EMNLP 2017](en/emnlp2017_sts.md)
-* [Experiments on SICK at NAACL-HLT 2018](en/naccl2018.md)
+* [Experiments on SICK at NAACL-HLT 2018](https://github.com/verypluming/ccg2lambda/blob/naacl/en/naacl2018.md)
 
 ## Interpreting (and writing your own) semantic templates.
 
