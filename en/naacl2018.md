@@ -41,7 +41,7 @@ cat phrase_results/score.txt
 and you should see something similar to this:
 
 ```
-Correct parsing: 0.9592 (4726/4927)
+Correct parsing: 0.9847 (4852/4927)
 Accuracy: 0.8422 (4150/4927)
 Recall: 0.7722
 Precision: 0.8408
@@ -49,15 +49,15 @@ F1 score: 0.8048
 Gold_correct_total: 2134
 System_answer_total: 1960
 System_correct_total: 1648
-----------------------------------------------------------------
+----------------------------------------------------------------
                             system                              
      |        |     yes |      no | unknown |   error |   total 
-----------------------------------------------------------------
-     |     yes|    1082 |       3 |     302 |      27 |    1414 
-gold |      no|      18 |     566 |     112 |      24 |     720 
-     | unknown|     247 |      44 |    2352 |     150 |    2793 
-     |   total|    1347 |     613 |    2766 |     201 |    4927 
-----------------------------------------------------------------
+----------------------------------------------------------------
+     |     yes|    1082 |       3 |     318 |      11 |    1414 
+gold |      no|      18 |     566 |     118 |      18 |     720 
+     | unknown|     247 |      44 |    2456 |      46 |    2793 
+     |   total|    1347 |     613 |    2892 |      75 |    4927 
+----------------------------------------------------------------
 ```
 
 If you want to see the results (syntactic/semantic parses, entailment judgements and HTML
