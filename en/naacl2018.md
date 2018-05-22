@@ -1,6 +1,12 @@
 # Experiments on SICK at NAACL-HLT 2018
 
-First, ensure that you have downloaded [C&C parser](http://www.cl.cam.ac.uk/~sc609/candc-1.00.html),
+First, you need to clone the repository and checkout a different branch at first:
+```bash
+git clone https://github.com/verypluming/ccg2lambda
+git checkout naacl
+```
+
+Then, ensure that you have downloaded [C&C parser](http://www.cl.cam.ac.uk/~sc609/candc-1.00.html),
 [EasyCCG parser](https://github.com/mikelewis0/easyccg), and [depccg parser](https://github.com/masashi-y/depccg) and wrote their installation locations
 in the files `en/parser_location.txt`.
 ```bash
