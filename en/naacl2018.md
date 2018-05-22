@@ -75,3 +75,9 @@ tar xvzf en/sick_intermediate_results.tgz
 ```
 
 which will create the `plain/`, `parsed/` and `phrase_results/` directories.
+
+If you want to extract phrase axioms from a sentence pair `plain/sick_trial_3373.txt`, you can test that by doing:
+
+```bash
+en/rte_en_mp_any_phrase.sh plain/sick_trial_3373.txt en/semantic_templates_en_event.yaml
+```
