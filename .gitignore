@@ -8,3 +8,4 @@ verbocean.*
 en/readme.txt
 en/SICK.semeval.txt
 .DS_Store
+data/*
