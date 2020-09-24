@@ -1,0 +1,10 @@
+!coqlib.v
+coqlib.*
+.python-version
+sick_phrase.sqlite3
+tactics_coq.txt
+.coqlib.aux
+verbocean.*
+en/readme.txt
+en/SICK.semeval.txt
+.DS_Store
