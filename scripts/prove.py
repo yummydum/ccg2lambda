@@ -23,7 +23,6 @@ from lxml import etree
 from multiprocessing import Pool
 from multiprocessing import Lock
 import os
-from subprocess import CalledProcessError
 from subprocess import TimeoutExpired
 import sys
 import textwrap
@@ -32,20 +31,26 @@ from semantic_tools import prove_doc
 from semparse import serialize_tree
 from utils import time_count
 from visualization_tools import convert_root_to_mathml
+from theorem import clean
 
 ARGS = None
 DOCS = None
 ABDUCTION = None
 kMaxTasksPerChild = None
 lock = Lock()
-SUBGOALS = []
+MATCHED_PREMISES = {}
+PREMISE = ''
+HYPOTHESIS = ''
 
 
 def main():
     global ARGS
     global DOCS
     global ABDUCTION
-    global SUBGOALS
+    global MATCHED_PREMISES
+    global PREMISE
+    global HYPOTHESIS
+
     DESCRIPTION = textwrap.dedent("""\
             The input file sem should contain the parsed sentences. All CCG trees correspond
             to the premises, except the last one, which is the hypothesis.
@@ -139,20 +144,17 @@ def main():
             fout.write(html_str)
 
     if ARGS.subgoals_out:
-        if len(SUBGOALS) != 0:
-            subgoals = SUBGOALS[0]
-            AB_output = ARGS.subgoals_out
-            AB_subgoals = subgoals[0]
-
-            if (ARGS.bidirection and flag_rev):
-                BA_subgoals = subgoals[2]
-                with codecs.open(ARGS.subgoals_out + '1', 'w',
-                                 'utf-8') as fout:
-                    fout.write('\n'.join(BA_subgoals))
-                AB_output = ARGS.subgoals_out + '0'
-
-            with codecs.open(AB_output, 'w', 'utf-8') as fout:
-                fout.write('\n'.join(AB_subgoals))
+        AB_output = ARGS.subgoals_out
+        with codecs.open(AB_output, 'w', 'utf-8') as fout:
+            fout.write('Premise:\n')
+            fout.write(PREMISE + '\n\n')
+            fout.write('Conclusion:\n')
+            fout.write(HYPOTHESIS + '\n\n')
+            for unproved, matched in MATCHED_PREMISES.items():
+                fout.write('Unproved: ' + unproved + '\n')
+                fout.write('Matched premises')
+                for e, p in matched['premise'].items():
+                    fout.write(f'E: {e}' + ','.join(p) + '\n\n')
 
 
 @time_count
@@ -195,23 +197,24 @@ def prove_doc_ind(document_ind):
     Perform RTE inference for the document ID document_ind.
     It returns an XML node with proof information.
     """
+    global MATCHED_PREMISES
+    global PREMISE
+    global HYPOTHESIS
     global lock
-    global SUBGOALS
     doc = DOCS[document_ind]
     proof_node = etree.Element('proof')
     inference_result = 'unknown'
     try:
         theorem = prove_doc(doc, ABDUCTION, ARGS)
+        PREMISE = clean(theorem.theorems[0].premises[0])
+        HYPOTHESIS = clean(theorem.theorems[0].conclusion)
+        MATCHED_PREMISES = theorem.theorems[0].matched_premises
         proof_node.set('status', 'success')
         inference_result = theorem.result
         proof_node.set('inference_result', inference_result)
         inference_result_rev = theorem.result_rev
-        if inference_result_rev is None:
-            flag_rev = False
-        else:
-            flag_rev = True
+        if inference_result_rev is not None:
             proof_node.set('inference_result_rev', inference_result_rev)
-        SUBGOALS = theorem.all_subgoals
         theorems_node = theorem.to_xml()
         proof_node.append(theorems_node)
     except TimeoutExpired as e:
@@ -220,18 +223,10 @@ def prove_doc_ind(document_ind):
         proof_node.set('inference_result_rev', 'unknown')
     except Exception as e:
         doc_id = doc.get('id', '(unspecified)')
-        lock.acquire()
-        logging.error(
-            'An error occurred: {0}\nDoc ID: {1}\nTree XML:\n{2}'.format(
-                e, doc_id,
-                etree.tostring(doc, encoding='utf-8',
-                               pretty_print=True).decode('utf-8')))
-        lock.release()
         proof_node.set('status', 'failed')
         proof_node.set('inference_result', 'unknown')
         proof_node.set('inference_result_rev', 'unknown')
-        raise Exception()
-
+        raise ValueError()
     return etree.tostring(proof_node)
 
 

@@ -16,7 +16,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import codecs
 from collections import OrderedDict
 import itertools
 import logging
@@ -24,25 +23,44 @@ from lxml import etree
 import subprocess
 import re
 
-from coq_analyzer import analyze_coq_output
+from coq_analyzer import analyze_coq_output, get_matched_premises
 from nltk2coq import normalize_interpretation
 from semantic_types import get_dynamic_library_from_doc
 from tactics import get_tactics
 from normalization import substitute_invalid_chars
+from nltk2normal import rename_variable, convert_to_prenex, remove_true
+
+
+def normalize(x):
+    return convert_to_prenex(rename_variable(remove_true(x)))
+
+
+def clean(x):
+    x = str(normalize(x))
+    x = x.replace('.(', '.(\n').replace(' & ', ' & \n')
+    x = x[:-1] + '\n)'
+    return x
+
 
 class Theorem(object):
     """
     Manage a theorem and its variations.
     """
-
-    def __init__(self, premises, conclusion, axioms=None, dynamic_library_str='',
-                 is_negated=False, is_reversed=False):
+    def __init__(self,
+                 premises,
+                 conclusion,
+                 axioms=None,
+                 dynamic_library_str='',
+                 is_negated=False,
+                 is_reversed=False):
         self.premises = premises
         self.conclusion = conclusion
         self.axioms = set() if axioms is None else axioms
         self.dynamic_library_str = dynamic_library_str
         self.inference_result = None
         self.coq_script = None
+        self.output_lines = None
+        self.matched_premises = None
         self.is_negated = is_negated
         self.is_reversed = is_reversed
         self.can_reverse = True
@@ -60,7 +78,8 @@ class Theorem(object):
         return hash(self.coq_script)
 
     def __eq__(self, other):
-        return isinstance(other, Theorem) and self.coq_script == other.coq_script
+        return isinstance(other,
+                          Theorem) and self.coq_script == other.coq_script
 
     @staticmethod
     def from_doc(doc):
@@ -70,13 +89,19 @@ class Theorem(object):
         formulas = get_formulas_from_doc(doc)
         if not formulas or len(formulas) < 2:
             return Theorem([], '', set(), '')
-        dynamic_library_str, formulas = get_dynamic_library_from_doc(doc, formulas)
+        dynamic_library_str, formulas = get_dynamic_library_from_doc(
+            doc, formulas)
         premises, conclusion = formulas[:-1], formulas[-1]
         theorem = Theorem(premises, conclusion, set(), dynamic_library_str)
         theorem.doc = doc
         return theorem
 
-    def copy(self, new_premises=None, new_conclusion=None, new_axioms=None, is_negated=None, is_reversed=None):
+    def copy(self,
+             new_premises=None,
+             new_conclusion=None,
+             new_axioms=None,
+             is_negated=None,
+             is_reversed=None):
         if new_premises is None:
             new_premises = self.premises
         if new_conclusion is None:
@@ -87,9 +112,12 @@ class Theorem(object):
             is_negated = self.is_negated
         if is_reversed is None:
             is_reversed = self.is_reversed
-        theorem = Theorem(
-            new_premises, new_conclusion, new_axioms,
-            self.dynamic_library_str, is_negated=is_negated, is_reversed=is_reversed)
+        theorem = Theorem(new_premises,
+                          new_conclusion,
+                          new_axioms,
+                          self.dynamic_library_str,
+                          is_negated=is_negated,
+                          is_reversed=is_reversed)
         theorem.doc = self.doc
         theorem.timeout = self.timeout
         self.variations.append(theorem)
@@ -97,9 +125,8 @@ class Theorem(object):
 
     def negate(self):
         negated_conclusion = negate_conclusion(self.conclusion)
-        theorem = self.copy(
-            new_conclusion=negated_conclusion,
-            is_negated=not self.is_negated)
+        theorem = self.copy(new_conclusion=negated_conclusion,
+                            is_negated=not self.is_negated)
         return theorem
 
     def reverse(self, is_negated=None):
@@ -108,11 +135,10 @@ class Theorem(object):
             return None
         if is_negated is None:
             is_negated = self.is_negated
-        theorem = self.copy(
-            [self.conclusion], 
-            self.premises[0], 
-            is_reversed=not self.is_reversed,
-            is_negated=is_negated)
+        theorem = self.copy([self.conclusion],
+                            self.premises[0],
+                            is_reversed=not self.is_reversed,
+                            is_negated=is_negated)
         return theorem
 
     @property
@@ -125,20 +151,20 @@ class Theorem(object):
     @property
     def result(self):
         for theorem in self.variations:
-          if not theorem.is_reversed:
-            if theorem.result_simple != 'unknown':
-                return theorem.result_simple
+            if not theorem.is_reversed:
+                if theorem.result_simple != 'unknown':
+                    return theorem.result_simple
         return 'unknown'
 
     @property
     def result_rev(self):
         for theorem in self.variations:
-          if not self.can_reverse:
-            return None
-          else:
-            if theorem.is_reversed:
-              if theorem.result_simple != 'unknown':
-                return theorem.result_simple
+            if not self.can_reverse:
+                return None
+            else:
+                if theorem.is_reversed:
+                    if theorem.result_simple != 'unknown':
+                        return theorem.result_simple
         return 'unknown'
 
     @property
@@ -152,15 +178,15 @@ class Theorem(object):
 
     def prove_debug(self, axioms=None):
         failure_log = OrderedDict()
-        coq_script = make_coq_script(
-            self.premises,
-            self.conclusion,
-            self.dynamic_library_str,
-            axioms=axioms)
+        coq_script = make_coq_script(self.premises,
+                                     self.conclusion,
+                                     self.dynamic_library_str,
+                                     axioms=axioms)
         current_tactics = get_tactics()
         debug_tactics = 'repeat nltac_base. try substitution. Qed'
         coq_script = coq_script.replace(current_tactics, debug_tactics)
         output_lines = run_coq_script(coq_script, self.timeout)
+        self.output_lines = output_lines
 
         if is_theorem_defined(output_lines):
             if axioms == self.axioms:
@@ -174,11 +200,9 @@ class Theorem(object):
 
     def prove_simple(self):
         # from pudb import set_trace; set_trace()
-        self.coq_script = make_coq_script(
-            self.premises,
-            self.conclusion,
-            self.dynamic_library_str,
-            self.axioms)
+        self.coq_script = make_coq_script(self.premises, self.conclusion,
+                                          self.dynamic_library_str,
+                                          self.axioms)
         self.inference_result = prove_script(self.coq_script, self.timeout)
         return
 
@@ -190,30 +214,34 @@ class Theorem(object):
             neg_theorem.prove_simple()
         if abduction and self.result == 'unknown' and self.doc is not None:
             abduction.attempt(self)
+
+        # Accumulate failure info
+        self.matched_premises = get_matched_premises(self.output_lines)
+
+        # Reverse theorem
         rev_theorem = self.reverse()
         if rev_theorem is None:
-          return
+            return
         else:
-          rev_theorem.prove_simple()
-          if rev_theorem.inference_result is False:
-              rev_neg_theorem = self.reverse(is_negated=True)
-              rev_neg_theorem.prove_simple()
-          return
+            rev_theorem.prove_simple()
+            if rev_theorem.inference_result is False:
+                rev_neg_theorem = self.reverse(is_negated=True)
+                rev_neg_theorem.prove_simple()
+            return
 
     def get_subgoals(self, abduction=None):
         for theorem in self.variations:
-          if not theorem.is_negated:
-            coq_script = make_coq_script(
-              theorem.premises,
-              theorem.conclusion,
-              theorem.dynamic_library_str,
-              axioms=theorem.axioms)
-            current_tactics = get_tactics()
-            debug_tactics = 'Set Firstorder Depth 1. nltac. Set Firstorder Depth 3. repeat nltac_base. Qed'
-            coq_script = coq_script.replace(current_tactics, debug_tactics)
-            output_lines = run_coq_script(coq_script, self.timeout)
-  
-            theorem.subgoals = get_subgoal_lines(output_lines)
+            if not theorem.is_negated:
+                coq_script = make_coq_script(theorem.premises,
+                                             theorem.conclusion,
+                                             theorem.dynamic_library_str,
+                                             axioms=theorem.axioms)
+                current_tactics = get_tactics()
+                debug_tactics = 'Set Firstorder Depth 1. nltac. Set Firstorder Depth 3. repeat nltac_base. Qed'
+                coq_script = coq_script.replace(current_tactics, debug_tactics)
+                output_lines = run_coq_script(coq_script, self.timeout)
+
+                theorem.subgoals = get_subgoal_lines(output_lines)
         return
 
     def to_xml(self):
@@ -241,8 +269,9 @@ class Theorem(object):
         ts_node.append(direct_node)
 
         reverse_node = etree.Element('reverse_definition')
-        reverse_node.text = make_coq_formulae(
-            self.premises, self.conclusion, reverse=True)
+        reverse_node.text = make_coq_formulae(self.premises,
+                                              self.conclusion,
+                                              reverse=True)
         ts_node.append(reverse_node)
 
         direct_node_neg = etree.Element('direct_definition_neg')
@@ -251,8 +280,10 @@ class Theorem(object):
         ts_node.append(direct_node_neg)
 
         reverse_node_neg = etree.Element('reverse_definition_neg')
-        reverse_node_neg.text = make_coq_formulae(
-            self.premises, negate_conclusion(self.conclusion), reverse=True)
+        reverse_node_neg.text = make_coq_formulae(self.premises,
+                                                  negate_conclusion(
+                                                      self.conclusion),
+                                                  reverse=True)
         ts_node.append(reverse_node_neg)
         # Add theorem(s) node.
         for theorem in self.variations:
@@ -284,6 +315,7 @@ def make_parser_labels_node(labels):
         ls_node.append(l_node)
     return ls_node
 
+
 def make_failure_log_node(failure_log):
     fnode = etree.Element('failure_log')
     if not failure_log:
@@ -306,14 +338,14 @@ def make_failure_log_node(failure_log):
             gn.set('predicate', g['subgoal'])
             gn.set('index', str(g['index']))
             gn.set('line', g['raw_subgoal'])
-    
+
             pns = etree.Element('matching_premises')
             gn.append(pns)
             for prem in g.get('matching_premises', []):
                 pn = etree.Element('matching_premise')
                 pns.append(pn)
                 pn.set('predicate', prem)
-    
+
             pns = etree.Element('matching_raw_premises')
             gn.append(pns)
             for prem in g.get('matching_raw_premises', []):
@@ -321,6 +353,7 @@ def make_failure_log_node(failure_log):
                 pns.append(pn)
                 pn.set('line', prem)
     return fnode
+
 
 def get_formulas_from_doc(doc):
     """
@@ -332,22 +365,31 @@ def get_formulas_from_doc(doc):
     has no semantic representation, it returns None to signal an error.
     """
     # TODO: we need to parameterize the way we obtain formulas for N-best parsing.
-    formulas = [s.get('sem', None) for s in doc.xpath(
-        './sentences/sentence/semantics[1]/span[1]')]
+    formulas = [
+        s.get('sem', None)
+        for s in doc.xpath('./sentences/sentence/semantics[1]/span[1]')
+    ]
     if len(formulas) < 2 or formulas[-1] == None:
         return None
     formulas = [f for f in formulas if f is not None]
     return formulas
 
+
 def make_coq_formulae(premise_interpretations, conclusion, reverse=False):
     interpretations = premise_interpretations + [conclusion]
-    interpretations = [normalize_interpretation(interp) for interp in interpretations]
+    interpretations = [
+        normalize_interpretation(interp) for interp in interpretations
+    ]
     if reverse:
         interpretations.reverse()
     coq_formulae = ' -> '.join(interpretations)
     return coq_formulae
 
-def make_coq_script(premise_interpretations, conclusion, dynamic_library = '', axioms=None):
+
+def make_coq_script(premise_interpretations,
+                    conclusion,
+                    dynamic_library='',
+                    axioms=None):
     # Transform these interpretations into coq format:
     #   interpretation1 -> interpretation2 -> ... -> conclusion
     coq_formulae = make_coq_formulae(premise_interpretations, conclusion)
@@ -360,9 +402,11 @@ def make_coq_script(premise_interpretations, conclusion, dynamic_library = '', a
     coq_script = substitute_invalid_chars(coq_script, 'replacement.txt')
     return coq_script
 
+
 def prove_script(coq_script, timeout=100):
     output_lines = run_coq_script(coq_script, timeout)
     return is_theorem_defined(output_lines)
+
 
 def run_coq_script(coq_script, timeout=100):
     """
@@ -376,25 +420,27 @@ def run_coq_script(coq_script, timeout=100):
     coq_script = substitute_invalid_chars(coq_script, 'replacement.txt')
     try:
         ps = subprocess.Popen(('echo', coq_script), stdout=subprocess.PIPE)
-        output = subprocess.check_output(
-            ('coqtop',),
-            stdin=ps.stdout,
-            stderr=subprocess.STDOUT,
-            timeout=timeout)
+        output = subprocess.check_output(('coqtop', ),
+                                         stdin=ps.stdout,
+                                         stderr=subprocess.STDOUT,
+                                         timeout=timeout)
         ps.wait()
     except subprocess.CalledProcessError as e:
         logging.error(
-            'Error when running the following script:\n{0}\nMessage was: {1}'.format(
-            coq_script, e))
+            'Error when running the following script:\n{0}\nMessage was: {1}'.
+            format(coq_script, e))
         return []
     output_lines = [
-        str(line).strip() for line in output.decode('utf-8').split('\n')]
+        str(line).strip() for line in output.decode('utf-8').split('\n')
+    ]
     return output_lines
+
 
 # Given a string reprsenting the logical interpretation of the conclusion,
 # it returns a string with the negated conclusion.
 def negate_conclusion(conclusion):
-    return - conclusion
+    return -conclusion
+
 
 # Check whether the string "is defined" appears in the output of coq.
 # In that case, we return True. Otherwise, we return False.
@@ -404,6 +450,7 @@ def is_theorem_defined(output_lines):
             return True
     return False
 
+
 def is_theorem_error(output_lines):
     """
     Errors in the construction of a theorem (type mismatches in axioms, etc.)
@@ -412,6 +459,7 @@ def is_theorem_error(output_lines):
     """
     return any('^^^^' in ol for ol in output_lines)
 
+
 def get_theorem_line(coq_script_lines):
     for i, line in enumerate(coq_script_lines):
         if line.startswith('Theorem '):
@@ -419,16 +467,18 @@ def get_theorem_line(coq_script_lines):
     assert False, 'There was no theorem defined in the coq script: {0}'\
         .format('\n'.join(coq_script_lines))
 
+
 def insert_axioms_in_coq_script(axioms, coq_script):
     coq_script_lines = coq_script.split('\n')
     theorem_line = get_theorem_line(coq_script_lines)
     for axiom in axioms:
         axiom_name = axiom.split()[1]
-        coq_script_lines.insert(
-            theorem_line, 'Hint Resolve {0}.'.format(axiom_name))
+        coq_script_lines.insert(theorem_line,
+                                'Hint Resolve {0}.'.format(axiom_name))
         coq_script_lines.insert(theorem_line, axiom)
     new_coq_script = '\n'.join(coq_script_lines)
     return new_coq_script
+
 
 # TODO: Move this to another file.
 class MasterTheorem(Theorem):
@@ -437,7 +487,6 @@ class MasterTheorem(Theorem):
     different semantic interpretations of sentences. Check those
     theorems and build an ensemble of judgements.
     """
-
     def __init__(self, theorems=None):
         self.theorems = [] if theorems is None else theorems
         self.doc = None
@@ -452,7 +501,8 @@ class MasterTheorem(Theorem):
         return hash(self.__repr__())
 
     def __eq__(self, other):
-        return isinstance(other, MasterTheorem) and self.__hash__() == other.__hash__()
+        return isinstance(
+            other, MasterTheorem) and self.__hash__() == other.__hash__()
 
     @staticmethod
     def from_doc(doc, args=None):
@@ -465,10 +515,12 @@ class MasterTheorem(Theorem):
         for semantics in generate_semantics_from_doc(doc, 100, use_gold_trees):
             formulas = [sem.xpath('./span[1]/@sem')[0] for sem in semantics]
             assert formulas and len(formulas) > 1
-            dynamic_library_str, formulas = get_dynamic_library_from_doc(doc, semantics)
+            dynamic_library_str, formulas = get_dynamic_library_from_doc(
+                doc, semantics)
             premises, conclusion = formulas[:-1], formulas[-1]
             theorem = Theorem(premises, conclusion, set(), dynamic_library_str)
-            labels = [(s.get('ccg_id', None), s.get('ccg_parser', None)) for s in semantics]
+            labels = [(s.get('ccg_id', None), s.get('ccg_parser', None))
+                      for s in semantics]
             theorem.labels = labels
             theorem.doc = doc
             theorem.timeout = timeout
@@ -488,11 +540,13 @@ class MasterTheorem(Theorem):
         for semantics in generate_semantics_from_doc(doc, 100, use_gold_trees):
             formulas = [sem.xpath('./span[1]/@sem')[0] for sem in semantics]
             assert formulas and len(formulas) > 1
-            dynamic_library_str, formulas = get_dynamic_library_from_doc(doc, semantics)
+            dynamic_library_str, formulas = get_dynamic_library_from_doc(
+                doc, semantics)
             premises, conclusion = formulas[:-1], formulas[-1]
             theorem = Theorem(premises, conclusion, set(), dynamic_library_str)
             theorem = theorem.reverse()
-            labels = [(s.get('ccg_id', None), s.get('ccg_parser', None)) for s in semantics]
+            labels = [(s.get('ccg_id', None), s.get('ccg_parser', None))
+                      for s in semantics]
             theorem.labels = labels
             theorem.doc = doc
             theorem.timeout = timeout
@@ -580,8 +634,9 @@ def generate_semantics_from_doc(doc, max_gen=1, use_gold_trees=False):
                 gold_ind = 0
             if 0 <= gold_ind < len(semantics):
                 if semantics[gold_ind].get('status', 'failed') != 'success':
-                    logging.warning('Requested gold_tree has a failed semantic parse: {0}\n{1}'.format(
-                        sentence.attrib, semantics[gold_ind].attrib))
+                    logging.warning(
+                        'Requested gold_tree has a failed semantic parse: {0}\n{1}'
+                        .format(sentence.attrib, semantics[gold_ind].attrib))
                 semantics = [semantics[gold_ind]]
         semantics_lists.append(semantics)
     # Case: the conclusion has no semantic interpretations.
@@ -600,27 +655,34 @@ def generate_semantics_from_doc(doc, max_gen=1, use_gold_trees=False):
         i += 1
         yield sems
     if i == 0:
-        logging.warning('Cartesian product of semantic interpretations exhausted with i == 0')
+        logging.warning(
+            'Cartesian product of semantic interpretations exhausted with i == 0'
+        )
     return
 
+
 def find_final_conclusion_sep_line_index(coq_output_lines):
-    indices = [i for i, line in enumerate(coq_output_lines)
-               if line.startswith('===') and line.endswith('===')]
+    indices = [
+        i for i, line in enumerate(coq_output_lines)
+        if line.startswith('===') and line.endswith('===')
+    ]
     if not indices:
         return None
     return indices[-1]
 
+
 ## for text similarity task
 def get_subgoal_lines(coq_output_lines):
     ## ConclusionLines
-    line_index_last_conclusion_sep = find_final_conclusion_sep_line_index(coq_output_lines)
+    line_index_last_conclusion_sep = find_final_conclusion_sep_line_index(
+        coq_output_lines)
     if not line_index_last_conclusion_sep:
         return None
-    ## extract all subgoals 
+    ## extract all subgoals
     subgoals = []
     subgoalflg = 0
-    subgoals.append(coq_output_lines[line_index_last_conclusion_sep+1])
-    for line in coq_output_lines[line_index_last_conclusion_sep+1:]:
+    subgoals.append(coq_output_lines[line_index_last_conclusion_sep + 1])
+    for line in coq_output_lines[line_index_last_conclusion_sep + 1:]:
         if subgoalflg == 1:
             subgoals.append(line)
             subgoalflg = 0

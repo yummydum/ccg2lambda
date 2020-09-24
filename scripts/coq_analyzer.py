@@ -284,6 +284,28 @@ def get_tree_pred_args(line, is_conclusion=False):
     return tree_args[0]
 
 
+def get_tree_pred_args2(line, is_conclusion=False):
+    """
+    Given the string representation of a premise, where each premise is:
+      pX : predicate1 (arg1 arg2 arg3)
+      pY : predicate2 arg1
+    or the conclusion, which is of the form:
+      predicate3 (arg2 arg4)
+    returns a tree or a string with the arguments of the predicate.
+    """
+    tree_args = None
+    if not is_conclusion:
+        tree_args = parse_coq_line(' '.join(line.split()[2:]))
+    else:
+        tree_args = parse_coq_line(line)
+    if tree_args is None or len(tree_args) < 1:
+        return None
+    if tree_args.height() >= 3:
+        return tree_args[0]  # return subtree
+    else:
+        return tree_args.leaves()  # return leave args (list, str)
+
+
 def get_predicate_arguments(premises, conclusion):
     """
     Given the string representations of the premises, where each premises is:
@@ -343,11 +365,7 @@ def make_graph(premises):
     return graph
 
 
-def analyze_coq_output2(output_lines):
-    """
-    Returns a failure log with information about the unproved subgoals.
-    """
-    failure_log = OrderedDict()
+def get_matched_premises(output_lines):
     premise_lines = get_premise_lines(output_lines)
     conclusion = get_conclusion_line(output_lines)
     subgoals = get_subgoals_from_coq_output2(output_lines)
@@ -389,7 +407,7 @@ def get_premises_that_match_conclusion_args2(premises, conclusion):
     graph = make_graph(premises)
 
     conclusion_name = conclusion.split(' ')[0]
-    arg = get_tree_pred_args(conclusion, is_conclusion=True)
+    arg = get_tree_pred_args2(conclusion, is_conclusion=True)
 
     if conclusion_name in {'Subj', 'Acc', 'Dat'}:
         breakpoint()
@@ -427,6 +445,9 @@ def get_prep_arg(p):
 
 
 def preprocess(premises, conclusion, subgoals):
+    if 'False' not in conclusion:
+        subgoals.append(conclusion)
+
     # Ununified
     for i in range(len(subgoals)):
         subgoals[i] = subgoals[i].replace('?x', 'z')
@@ -441,7 +462,6 @@ def preprocess(premises, conclusion, subgoals):
             premises[i] = premises[i].replace(var, e)
         for i in range(len(subgoals)):
             subgoals[i] = subgoals[i].replace(var, e)
-        conclusion = conclusion.replace(var, e)
 
     # Filter True and Event
     premises = [
@@ -454,7 +474,7 @@ def preprocess(premises, conclusion, subgoals):
     max_ind = 100  # fix this
     result = []
     for p in premises:
-        arg = get_tree_pred_args(p)
+        arg = get_tree_pred_args2(p)
         if isinstance(arg, Tree):
             label = arg.label()
             leave = arg.leaves()
@@ -466,11 +486,8 @@ def preprocess(premises, conclusion, subgoals):
             original = f'({label} {event})'
             result.append(p.replace(original, ent))
             result.append(f'{label} {event} = {ent}')
-
             for i in range(len(subgoals)):
                 subgoals[i] = subgoals[i].replace(original, ent)
-
-            conclusion = conclusion.replace(original, ent)
 
         elif isinstance(arg, list):
             for x in arg:
@@ -479,12 +496,8 @@ def preprocess(premises, conclusion, subgoals):
             result.append(p)
         else:
             ValueError()
-
     # Filter H
     result = [x.split(' : ')[1] if x.startswith('H') else x for x in result]
 
     # merge conclucion and subgoals
-    if 'False' in conclusion:
-        subgoals.append(conclusion)
-        print('Conclusion False', conclusion)
     return result, subgoals
