@@ -9,3 +9,4 @@ en/readme.txt
 en/SICK.semeval.txt
 .DS_Store
 data/*
+*__pycache__*

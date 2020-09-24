@@ -16,8 +16,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import print_function
-
 import argparse
 import codecs
 import logging
@@ -35,19 +33,20 @@ from semparse import serialize_tree
 from utils import time_count
 from visualization_tools import convert_root_to_mathml
 
-ARGS=None
-DOCS=None
-ABDUCTION=None
-kMaxTasksPerChild=None
+ARGS = None
+DOCS = None
+ABDUCTION = None
+kMaxTasksPerChild = None
 lock = Lock()
-SUBGOALS=[]
+SUBGOALS = []
 
-def main(args = None):
+
+def main():
     global ARGS
     global DOCS
     global ABDUCTION
     global SUBGOALS
-    DESCRIPTION=textwrap.dedent("""\
+    DESCRIPTION = textwrap.dedent("""\
             The input file sem should contain the parsed sentences. All CCG trees correspond
             to the premises, except the last one, which is the hypothesis.
       """)
@@ -56,37 +55,63 @@ def main(args = None):
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=DESCRIPTION)
     parser.add_argument("sem", help="XML input filename with semantics")
-    parser.add_argument("--proof", default="",
-        help="XML output filename with proof information")
-    parser.add_argument("--graph_out", nargs='?', type=str, default="",
-        help="HTML graphical output filename.")
-    parser.add_argument("--abduction", nargs='?', type=str, default="no",
+    parser.add_argument("--proof",
+                        default="",
+                        help="XML output filename with proof information")
+    parser.add_argument("--graph_out",
+                        nargs='?',
+                        type=str,
+                        default="",
+                        help="HTML graphical output filename.")
+    parser.add_argument(
+        "--abduction",
+        nargs='?',
+        type=str,
+        default="no",
         choices=["no", "naive", "spsa"],
-        help="Activate on-demand axiom injection (default: no axiom injection).")
+        help="Activate on-demand axiom injection (default: no axiom injection)."
+    )
     parser.add_argument("--gold_trees", action="store_true", default=True)
-    parser.add_argument("--print", nargs='?', type=str, default="result",
+    parser.add_argument(
+        "--print",
+        nargs='?',
+        type=str,
+        default="result",
         choices=["result", "status", "both"],
-        help="Print to standard output the inference result or termination status.")
-    parser.add_argument("--print_length", nargs='?', type=str, default="full",
-        choices=["full", "short", "zero"],
-        help="Length of printed output.")
-    parser.add_argument("--timeout", nargs='?', type=int, default="100",
-        help="Maximum running time for each possible theorem.")
-    parser.add_argument("--ncores", nargs='?', type=int, default="1",
-        help="Number of cores for multiprocessing.")
+        help=
+        "Print to standard output the inference result or termination status.")
+    parser.add_argument("--print_length",
+                        nargs='?',
+                        type=str,
+                        default="full",
+                        choices=["full", "short", "zero"],
+                        help="Length of printed output.")
+    parser.add_argument("--timeout",
+                        nargs='?',
+                        type=int,
+                        default="100",
+                        help="Maximum running time for each possible theorem.")
+    parser.add_argument("--ncores",
+                        nargs='?',
+                        type=int,
+                        default="1",
+                        help="Number of cores for multiprocessing.")
     parser.add_argument("--subgoals", action="store_true", default=False)
-    parser.add_argument("--subgoals_out", nargs='?', type=str, default="",
-        help="subgoals output filename.")
+    parser.add_argument("--subgoals_out",
+                        nargs='?',
+                        type=str,
+                        default="",
+                        help="subgoals output filename.")
     parser.add_argument("--bidirection", action="store_true", default=False)
     ARGS = parser.parse_args()
 
     logging.basicConfig(level=logging.WARNING)
-      
+
     if not os.path.exists(ARGS.sem):
         print('File does not exist: {0}'.format(ARGS.sem), file=sys.stderr)
         parser.print_help(file=sys.stderr)
         sys.exit(1)
-    
+
     if ARGS.abduction == "spsa":
         from abduction_spsa import AxiomsWordnet
         ABDUCTION = AxiomsWordnet()
@@ -114,34 +139,21 @@ def main(args = None):
             fout.write(html_str)
 
     if ARGS.subgoals_out:
-      if len(SUBGOALS) != 0:
-        subgoals = SUBGOALS[0]
-        AB_output = ARGS.subgoals_out
-        AB_subgoals = subgoals[0]
+        if len(SUBGOALS) != 0:
+            subgoals = SUBGOALS[0]
+            AB_output = ARGS.subgoals_out
+            AB_subgoals = subgoals[0]
 
-        if (ARGS.bidirection and flag_rev):
-          BA_subgoals = subgoals[2]
-          with codecs.open(ARGS.subgoals_out+'1', 'w', 'utf-8') as fout:
-            fout.write('\n'.join(BA_subgoals))
-          AB_output = ARGS.subgoals_out+'0'
+            if (ARGS.bidirection and flag_rev):
+                BA_subgoals = subgoals[2]
+                with codecs.open(ARGS.subgoals_out + '1', 'w',
+                                 'utf-8') as fout:
+                    fout.write('\n'.join(BA_subgoals))
+                AB_output = ARGS.subgoals_out + '0'
 
-        with codecs.open(AB_output, 'w', 'utf-8') as fout:
-          fout.write('\n'.join(AB_subgoals))
-#        for i, proof_node in enumerate(proof_nodes):
-#          for j, p in enumerate(proof_node):
-#            subgoals.extend(p.xpath('//subgoals'))
-#            subgoals = [s.replace(',','\n') for s in subgoals if s is not None]
-#            with codecs.open(ARGS.subgoals_out+str(i)+'_'+str(j), 'w', 'utf-8') as fout:
-#              fout.write('\n'.join(subgoals))
+            with codecs.open(AB_output, 'w', 'utf-8') as fout:
+                fout.write('\n'.join(AB_subgoals))
 
-#        for p in proof_nodes:
-#          subgoals.extend(p.xpath('//subgoals'))
-#        subgoals = [s.text for s in subgoals]
-#        subgoals = [s.replace(',','\n') for s in subgoals if s is not None]
-#        with codecs.open(ARGS.subgoals_out, 'w', 'utf-8') as fout:
-#          fout.write('\n'.join(subgoals))
-
-          
 
 @time_count
 def serialize_tree_to_file(tree_xml, fname):
@@ -149,6 +161,7 @@ def serialize_tree_to_file(tree_xml, fname):
     with codecs.open(fname, 'wb') as fout:
         fout.write(root_xml_str)
     return
+
 
 @time_count
 def prove_docs(document_inds, ncores=1):
@@ -160,12 +173,14 @@ def prove_docs(document_inds, ncores=1):
     proof_nodes = [etree.fromstring(p) for p in proof_nodes]
     return proof_nodes
 
+
 def prove_docs_par(document_inds, ncores=3):
     pool = Pool(processes=ncores, maxtasksperchild=kMaxTasksPerChild)
     proof_nodes = pool.map(prove_doc_ind, document_inds)
     pool.close()
     pool.join()
     return proof_nodes
+
 
 def prove_docs_seq(document_inds):
     proof_nodes = []
@@ -174,6 +189,7 @@ def prove_docs_seq(document_inds):
         proof_nodes.append(proof_node)
     return proof_nodes
 
+
 def prove_doc_ind(document_ind):
     """
     Perform RTE inference for the document ID document_ind.
@@ -181,7 +197,6 @@ def prove_doc_ind(document_ind):
     """
     global lock
     global SUBGOALS
-    global flag_rev
     doc = DOCS[document_ind]
     proof_node = etree.Element('proof')
     inference_result = 'unknown'
@@ -192,10 +207,10 @@ def prove_doc_ind(document_ind):
         proof_node.set('inference_result', inference_result)
         inference_result_rev = theorem.result_rev
         if inference_result_rev is None:
-          flag_rev = False
+            flag_rev = False
         else:
-          flag_rev = True
-          proof_node.set('inference_result_rev', inference_result_rev)
+            flag_rev = True
+            proof_node.set('inference_result_rev', inference_result_rev)
         SUBGOALS = theorem.all_subgoals
         theorems_node = theorem.to_xml()
         proof_node.append(theorems_node)
@@ -206,40 +221,19 @@ def prove_doc_ind(document_ind):
     except Exception as e:
         doc_id = doc.get('id', '(unspecified)')
         lock.acquire()
-        logging.error('An error occurred: {0}\nDoc ID: {1}\nTree XML:\n{2}'.format(
-            e, doc_id,
-            etree.tostring(doc, encoding='utf-8', pretty_print=True).decode('utf-8')))
+        logging.error(
+            'An error occurred: {0}\nDoc ID: {1}\nTree XML:\n{2}'.format(
+                e, doc_id,
+                etree.tostring(doc, encoding='utf-8',
+                               pretty_print=True).decode('utf-8')))
         lock.release()
         proof_node.set('status', 'failed')
         proof_node.set('inference_result', 'unknown')
         proof_node.set('inference_result_rev', 'unknown')
-    if ARGS.print == 'status':
-        label = proof_node.get('status')
-    if ARGS.print == 'result':
-        label = proof_node.get('inference_result', 'unknown')
-    else:
-        label = proof_node.get('inference_result', 'unknown') + ' (' + proof_node.get('status') +')'
+        raise Exception()
 
-    if (ARGS.bidirection and flag_rev):
-      if ARGS.print == 'result':
-          label_rev = proof_node.get('inference_result_rev', 'unknown')
-      else:
-          label_rev = proof_node.get('inference_result_rev', 'unknown') + ' (' + proof_node.get('status') +')'
-        
-    lock.acquire()
-    if ARGS.print_length == 'full':
-        pair_id = doc.get('pair_id', '').strip()
-        if (ARGS.bidirection and flag_rev):
-          result = '{0} {1}'.format(pair_id, label) if len(pair_id) > 0 else 'A=>B: ' + label + ', B=>A: ' + label_rev
-          print(result, end='\n', file=sys.stdout)
-        else:
-          result = '{0} {1}'.format(pair_id, label) if len(pair_id) > 0 else label
-          print(result, end='\n', file=sys.stdout)
-    elif ARGS.print_length == 'short':
-        print(label[0], end='', file=sys.stdout)
-    lock.release()
-    sys.stdout.flush()
     return etree.tostring(proof_node)
+
 
 if __name__ == '__main__':
     main()

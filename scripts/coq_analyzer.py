@@ -19,24 +19,30 @@ from __future__ import print_function
 from collections import OrderedDict
 import logging
 import re
-import sys
 
 from nltk import Tree
 
 from normalization import denormalize_token
 from tree_tools import tree_or_string, tree_contains
 
+from graph import Graph
+
+
 def find_final_subgoal_line_index(coq_output_lines):
-    indices = [i for i, line in enumerate(coq_output_lines)
-               if line.endswith('subgoal')]
+    indices = [
+        i for i, line in enumerate(coq_output_lines)
+        if line.endswith('subgoal')
+    ]
     if not indices:
         return None
     return indices[-1]
 
 
 def find_final_conclusion_sep_line_index(coq_output_lines):
-    indices = [i for i, line in enumerate(coq_output_lines)
-               if line.startswith('===') and line.endswith('===')]
+    indices = [
+        i for i, line in enumerate(coq_output_lines)
+        if line.startswith('===') and line.endswith('===')
+    ]
     if not indices:
         return None
     return indices[-1]
@@ -62,6 +68,7 @@ def get_conclusion_line(coq_output_lines):
     if not line_index_last_conclusion_sep:
         return None
     return coq_output_lines[line_index_last_conclusion_sep + 1]
+
 
 def get_premises_that_match_conclusion_args_(premises, conclusion):
     """
@@ -103,21 +110,6 @@ def get_premises_that_match_conclusion_args(premises, conclusion):
     return candidate_premises
 
 
-def make_axioms_from_premises_and_conclusion(premises, conclusion, coq_output_lines=None):
-    matching_premises = get_premises_that_match_conclusion_args(
-        premises, conclusion)
-    premise_preds = [premise.split()[2] for premise in matching_premises]
-    conclusion_pred = conclusion.split()[0]
-    pred_args = get_predicate_arguments(premises, conclusion)
-    axioms = make_axioms_from_preds(premise_preds, conclusion_pred, pred_args)
-    # print('Has axioms: {0}'.format(axioms), file=sys.stderr)
-    failure_log = OrderedDict()
-    if not axioms:
-        failure_log = make_failure_log(
-            conclusion_pred, premise_preds, conclusion, premises, coq_output_lines)
-        # print(json.dumps(failure_log), file=sys.stderr)
-    return axioms, failure_log
-
 def analyze_coq_output(output_lines):
     """
     Returns a failure log with information about the unproved subgoals.
@@ -126,8 +118,10 @@ def analyze_coq_output(output_lines):
     premise_lines = get_premise_lines(output_lines)
     conclusion = get_conclusion_line(output_lines)
     if not premise_lines or not conclusion:
-        failure_log = {"type error": has_type_error(output_lines),
-                       "open formula": has_open_formula(output_lines)}
+        failure_log = {
+            "type error": has_type_error(output_lines),
+            "open formula": has_open_formula(output_lines)
+        }
         return failure_log
 
     matching_premises = get_premises_that_match_conclusion_args(
@@ -135,11 +129,15 @@ def analyze_coq_output(output_lines):
     premise_preds = [premise.split()[2] for premise in matching_premises]
     conclusion_pred = conclusion.split()[0]
 
-    failure_log = make_failure_log(
-        conclusion_pred, premise_preds, conclusion, premise_lines, output_lines)
+    failure_log = make_failure_log(conclusion_pred, premise_preds, conclusion,
+                                   premise_lines, output_lines)
     return failure_log
 
-def make_failure_log(conclusion_pred, premise_preds, conclusion, premises,
+
+def make_failure_log(conclusion_pred,
+                     premise_preds,
+                     conclusion,
+                     premises,
                      coq_output_lines=None):
     """
     Produces a dictionary with the following structure:
@@ -171,12 +169,14 @@ def make_failure_log(conclusion_pred, premise_preds, conclusion, premises,
     failure_log["all_premises"] = premise_preds
     failure_log["other_sub-goals"] = get_subgoals_from_coq_output(
         coq_output_lines, premises)
-    failure_log["other_sub-goals"].insert(0, {
-        'subgoal': conclusion_base,
-        'index': 1,
-        'raw_subgoal': conclusion,
-        'matching_premises' : premises_base,
-        'matching_raw_premises' : premises_base})
+    failure_log["other_sub-goals"].insert(
+        0, {
+            'subgoal': conclusion_base,
+            'index': 1,
+            'raw_subgoal': conclusion,
+            'matching_premises': premises_base,
+            'matching_raw_premises': premises_base
+        })
     failure_log["type_error"] = has_type_error(coq_output_lines)
     failure_log["open_formula"] = has_open_formula(coq_output_lines)
     return failure_log
@@ -239,16 +239,20 @@ def get_subgoals_from_coq_output(coq_output_lines, premises):
             subgoal = {
                 'subgoal': denormalize_token(line_tokens[0]),
                 'index': subgoal_index,
-                'raw_subgoal': subgoal_line}
+                'raw_subgoal': subgoal_line
+            }
             matching_premises = get_premises_that_match_conclusion_args(
                 premises, subgoal_line)
             subgoal['matching_raw_premises'] = matching_premises
             premise_preds = [
-                denormalize_token(premise.split()[2]) for premise in matching_premises]
+                denormalize_token(premise.split()[2])
+                for premise in matching_premises
+            ]
             subgoal['matching_premises'] = premise_preds
             subgoals.append(subgoal)
             subgoal_index = -1
-        if len(line_tokens) >= 3 and line_tokens[0] == 'subgoal' and line_tokens[2] == 'is:':
+        if len(line_tokens) >= 3 and line_tokens[
+                0] == 'subgoal' and line_tokens[2] == 'is:':
             subgoal_index = int(line_tokens[1])
     return subgoals
 
@@ -324,3 +328,163 @@ def get_predicate_arguments(premises, conclusion):
         del pred_args[conf_pred]
     return pred_args
 
+
+def make_graph(premises):
+    graph = Graph()
+    for premise in premises:
+        if '=' in premise:
+            premise = premise.replace('=', '')
+            name, event, entity = premise.split()
+            graph.addRelation(event, entity, name)
+        else:
+            pred_name = premise.split(' ')[0]
+            arg = premise.split(' ')[1:]
+            graph.addPred(pred_name, arg)
+    return graph
+
+
+def analyze_coq_output2(output_lines):
+    """
+    Returns a failure log with information about the unproved subgoals.
+    """
+    failure_log = OrderedDict()
+    premise_lines = get_premise_lines(output_lines)
+    conclusion = get_conclusion_line(output_lines)
+    subgoals = get_subgoals_from_coq_output2(output_lines)
+    premises, subgoals = preprocess(premise_lines, conclusion, subgoals)
+    if not premise_lines:
+        raise ValueError('Type error')
+    elif not subgoals:  # proved?
+        return {}
+    else:
+        result = {}
+        for subgoal in subgoals:
+            result[subgoal] = get_premises_that_match_conclusion_args2(
+                premises, subgoal)
+        return result
+
+
+def get_subgoals_from_coq_output2(coq_output_lines):
+    subgoals = []
+    is_subgoal = False
+    for line in coq_output_lines:
+        if line.strip() == '':
+            continue
+        line_tokens = line.split()
+        if len(line_tokens) >= 3 and line_tokens[
+                0] == 'subgoal' and line_tokens[2] == 'is:':
+            is_subgoal = True
+        elif is_subgoal:
+            subgoals.append(line)
+            is_subgoal = False
+
+    return subgoals
+
+
+def get_premises_that_match_conclusion_args2(premises, conclusion):
+
+    result = {}
+    result['premise'] = {}
+
+    graph = make_graph(premises)
+
+    conclusion_name = conclusion.split(' ')[0]
+    arg = get_tree_pred_args(conclusion, is_conclusion=True)
+
+    if conclusion_name in {'Subj', 'Acc', 'Dat'}:
+        breakpoint()
+        assert isinstance(arg, list) and len(arg) == 3 and arg[1] == '='
+        result[conclusion_name] = []
+        for i in [0, 2]:
+            result[conclusion_name].append(graph.get_e(arg[i]))
+    elif isinstance(arg, list):
+        for e_str in arg:
+            e = graph.get_e(e_str)
+            for p in e.predicates:
+                if len(p.args) == 1:
+                    if e.name not in result['premise']:
+                        result['premise'][e.name] = []
+                    result['premise'][e.name].append(p.name)
+                # Prepositoinal case
+                elif len(p.args) == 2:
+                    result['premise'][e.name] += get_prep_arg(p)
+                else:
+                    raise ValueError()
+    else:
+        raise ValueError(arg)
+    return result
+
+
+def get_prep_arg(p):
+    result = []
+    for e in p.args:
+        if e.name not in result['premise']:
+            result['premise'][e.name] = []
+        for pred in e.predicates:
+            if pred.name != p.name:
+                result.append(pred.name)
+    return result
+
+
+def preprocess(premises, conclusion, subgoals):
+    # Ununified
+    for i in range(len(subgoals)):
+        subgoals[i] = subgoals[i].replace('?x', 'z')
+
+    # Event
+    type_prop = [x for x in premises if x.endswith('Event')]
+    for t in type_prop:
+        var = t.split(' : ')[0]
+        e = f'e{var[1:]}'
+        # Replace x to e
+        for i in range(len(premises)):
+            premises[i] = premises[i].replace(var, e)
+        for i in range(len(subgoals)):
+            subgoals[i] = subgoals[i].replace(var, e)
+        conclusion = conclusion.replace(var, e)
+
+    # Filter True and Event
+    premises = [
+        x for x in premises if x.startswith('H') and not x.endswith('True')
+    ]
+
+    # semantic role
+    premises = sorted(premises, key=lambda x: len(x.split('(')))
+    events = set()
+    max_ind = 100  # fix this
+    result = []
+    for p in premises:
+        arg = get_tree_pred_args(p)
+        if isinstance(arg, Tree):
+            label = arg.label()
+            leave = arg.leaves()
+            assert len(leave) == 1
+            event = leave[0]
+            assert event in events
+            ent = f'x{max_ind}'
+            max_ind += 1
+            original = f'({label} {event})'
+            result.append(p.replace(original, ent))
+            result.append(f'{label} {event} = {ent}')
+
+            for i in range(len(subgoals)):
+                subgoals[i] = subgoals[i].replace(original, ent)
+
+            conclusion = conclusion.replace(original, ent)
+
+        elif isinstance(arg, list):
+            for x in arg:
+                if x.startswith('e'):
+                    events.add(x)
+            result.append(p)
+        else:
+            ValueError()
+
+    # Filter H
+    result = [x.split(' : ')[1] if x.startswith('H') else x for x in result]
+
+    # merge conclucion and subgoals
+    if 'False' in conclusion:
+        subgoals.append(conclusion)
+        print('Conclusion False', conclusion)
+    return result, subgoals
