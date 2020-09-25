@@ -452,11 +452,9 @@ def preprocess(premises, conclusion, subgoals_original):
         if '?x' in s:
             pred = s.split(' ')[0]
             args = s.split(' ')[1:]
-
             if len(args) == 1:
                 temp[args[0]] = pred
                 continue
-
             elif len(args) == 2:
                 for a in args:
                     if '?x' not in a:
@@ -464,7 +462,7 @@ def preprocess(premises, conclusion, subgoals_original):
                     else:
                         unun_arg = a
                 s = f'{pred}{temp[unun_arg]} {new_arg}'
-            subgoals.append(s)
+        subgoals.append(s)
 
     # Event
     type_prop = [x for x in premises if x.endswith('Event')]
