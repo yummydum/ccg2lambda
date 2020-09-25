@@ -408,14 +408,13 @@ def get_premises_that_match_conclusion_args2(premises, conclusion):
 
     conclusion_name = conclusion.split(' ')[0]
     arg = get_tree_pred_args2(conclusion, is_conclusion=True)
-
     if conclusion_name in {'Subj', 'Acc', 'Dat'}:
         breakpoint()
         assert isinstance(arg, list) and len(arg) == 3 and arg[1] == '='
         result[conclusion_name] = []
         for i in [0, 2]:
             result[conclusion_name].append(graph.get_e(arg[i]))
-    elif isinstance(arg, list):
+    else:
         for e_str in arg:
             e = graph.get_e(e_str)
             for p in e.predicates:
@@ -428,8 +427,6 @@ def get_premises_that_match_conclusion_args2(premises, conclusion):
                     result['premise'][e.name] += get_prep_arg(p)
                 else:
                     raise ValueError()
-    else:
-        raise ValueError(arg)
     return result
 
 
@@ -444,13 +441,30 @@ def get_prep_arg(p):
     return result
 
 
-def preprocess(premises, conclusion, subgoals):
+def preprocess(premises, conclusion, subgoals_original):
     if 'False' not in conclusion:
-        subgoals.append(conclusion)
+        subgoals_original.append(conclusion)
 
-    # Ununified
-    for i in range(len(subgoals)):
-        subgoals[i] = subgoals[i].replace('?x', 'z')
+    # Ununified preds
+    subgoals = []
+    temp = {}
+    for s in sorted(subgoals_original, key=lambda x: len(x.split(' '))):
+        if '?x' in s:
+            pred = s.split(' ')[0]
+            args = s.split(' ')[1:]
+
+            if len(args) == 1:
+                temp[args[0]] = pred
+                continue
+
+            elif len(args) == 2:
+                for a in args:
+                    if '?x' not in a:
+                        new_arg = a
+                    else:
+                        unun_arg = a
+                s = f'{pred}{temp[unun_arg]} {new_arg}'
+            subgoals.append(s)
 
     # Event
     type_prop = [x for x in premises if x.endswith('Event')]

@@ -152,9 +152,9 @@ def main():
             fout.write(HYPOTHESIS + '\n\n')
             for unproved, matched in MATCHED_PREMISES.items():
                 fout.write('Unproved: ' + unproved + '\n')
-                fout.write('Matched premises')
+                fout.write('Matched premises: ')
                 for e, p in matched['premise'].items():
-                    fout.write(f'E: {e}' + ','.join(p) + '\n\n')
+                    fout.write(f'E: {e}, ' + ','.join(p) + '\n\n')
 
 
 @time_count
