@@ -216,7 +216,7 @@ class Theorem(object):
             abduction.attempt(self)
 
         # Accumulate failure info
-        self.matched_premises = get_matched_premises(self.output_lines)
+        self.created_axioms = get_matched_premises(self.output_lines)
 
         # Reverse theorem
         rev_theorem = self.reverse()

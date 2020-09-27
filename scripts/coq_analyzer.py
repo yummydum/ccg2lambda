@@ -25,7 +25,7 @@ from nltk import Tree
 from normalization import denormalize_token
 from tree_tools import tree_or_string, tree_contains
 
-from graph import Graph
+from graph import Graph, Event, Entity
 
 
 def find_final_subgoal_line_index(coq_output_lines):
@@ -374,12 +374,7 @@ def get_matched_premises(output_lines):
         raise ValueError('Type error')
     elif not subgoals:  # proved?
         return {}
-    else:
-        result = {}
-        for subgoal in subgoals:
-            result[subgoal] = get_premises_that_match_conclusion_args2(
-                premises, subgoal)
-        return result
+    return create_axioms(premises, subgoals)
 
 
 def get_subgoals_from_coq_output2(coq_output_lines):
@@ -399,42 +394,31 @@ def get_subgoals_from_coq_output2(coq_output_lines):
     return subgoals
 
 
-def get_premises_that_match_conclusion_args2(premises, conclusion):
+def is_sr(e):
+    return isinstance(
+        e, str) and e.split(' ')[0].lower() in {'subj', 'acc', 'dat'}
 
-    result = {}
-    result['premise'] = {}
 
+def create_axioms(premises, subgoals):
+    result = []
     graph = make_graph(premises)
-
-    conclusion_name = conclusion.split(' ')[0]
-    arg = get_tree_pred_args2(conclusion, is_conclusion=True)
-    if conclusion_name in {'Subj', 'Acc', 'Dat'}:
-        breakpoint()
-        assert isinstance(arg, list) and len(arg) == 3 and arg[1] == '='
-        result[conclusion_name] = []
-        for i in [0, 2]:
-            result[conclusion_name].append(graph.get_e(arg[i]))
-    else:
-        for e_str in arg:
-            e = graph.get_e(e_str)
-            for p in e.predicates:
-                if len(p.args) == 1:
-                    if e.name not in result['premise']:
-                        result['premise'][e.name] = []
-                    result['premise'][e.name].append(p.name)
-                # Prepositoinal case
-                elif len(p.args) == 2:
-                    result['premise'][e.name] += get_prep_arg(p)
-                else:
-                    raise ValueError()
+    for subgoal in subgoals:
+        if is_sr(subgoal):
+            assert '=' in conclucion
+            x, y = conclusion.split(' = ')
+            axiom = f'{get_name(graph.get_e(x))} -> {get_name(graph.get_e(y))}'
+        else:
+            arg = get_tree_pred_args2(subgoal, is_conclusion=True)
+            axiom_premise = ' & '.join(
+                [graph.get_e(a).get_pred_str() for a in arg])
+            axiom = f'{axiom_premise} -> {subgoal}'
+        result.append(axiom)
     return result
 
 
 def get_prep_arg(p):
     result = []
     for e in p.args:
-        if e.name not in result['premise']:
-            result['premise'][e.name] = []
         for pred in e.predicates:
             if pred.name != p.name:
                 result.append(pred.name)
@@ -442,6 +426,7 @@ def get_prep_arg(p):
 
 
 def preprocess(premises, conclusion, subgoals_original):
+
     if 'False' not in conclusion:
         subgoals_original.append(conclusion)
 
@@ -449,6 +434,7 @@ def preprocess(premises, conclusion, subgoals_original):
     subgoals = []
     temp = {}
     for s in sorted(subgoals_original, key=lambda x: len(x.split(' '))):
+        s = s.replace('?z', '?x')
         if '?x' in s:
             pred = s.split(' ')[0]
             args = s.split(' ')[1:]
@@ -485,6 +471,7 @@ def preprocess(premises, conclusion, subgoals_original):
     events = set()
     max_ind = 100  # fix this
     result = []
+    replace_dict = {}
     for p in premises:
         arg = get_tree_pred_args2(p)
         if isinstance(arg, Tree):
@@ -493,9 +480,14 @@ def preprocess(premises, conclusion, subgoals_original):
             assert len(leave) == 1
             event = leave[0]
             assert event in events
-            ent = f'x{max_ind}'
-            max_ind += 1
             original = f'({label} {event})'
+            if original in replace_dict:
+                ent = replace_dict[original]
+            else:
+                ent = f'x{max_ind}'
+                replace_dict[original] = ent
+                max_ind += 1
+
             result.append(p.replace(original, ent))
             result.append(f'{label} {event} = {ent}')
             for i in range(len(subgoals)):
@@ -508,6 +500,7 @@ def preprocess(premises, conclusion, subgoals_original):
             result.append(p)
         else:
             ValueError()
+
     # Filter H
     result = [x.split(' : ')[1] if x.startswith('H') else x for x in result]
 

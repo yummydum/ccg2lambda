@@ -30,13 +30,19 @@ class Graph:
         return
 
     def get_e(self, e):
-        t, i = parse(e)
-        if t == 'x':
-            return self.entities[i]
-        elif t == 'e':
-            return self.events[i]
+        if e.split(' ')[0].lower() in {'subj', 'acc', 'dat'}:
+            sr, e_ = e.split(' ')
+            t, i = parse(e_)
+            assert t == 'e' and hasattr(e_, sr)
+            return getattr(self.events[i], sr)
         else:
-            raise ValueError()
+            t, i = parse(e)
+            if t == 'x':
+                return self.entities[i]
+            elif t == 'e':
+                return self.events[i]
+            else:
+                raise ValueError()
 
 
 class Predicate():
@@ -92,8 +98,11 @@ class Entity:
         self.predicates.append(p)
         return
 
+    def get_pred_str(self):
+        return ' & '.join([f'{p.name} {self.name}' for p in self.predicates])
+
     def __repr__(self):
-        return f'{self.name}: ' + f" Preds: {' '.join([p.name for p in self.predicates])}"
+        return self.get_pred_str()
 
 
 class Event:
@@ -113,7 +122,10 @@ class Event:
         setattr(self, name.lower(), x)
 
     def __repr__(self):
-        return f'{self.name}: ' + f" Preds: {' '.join([p.name for p in self.predicates])}"
+        return self.get_pred_str()
+
+    def get_pred_str(self):
+        return f'Subj({self.name}) = {self.subj.name} & {self.subj.get_pred_str()}'
 
 
 def parse(x):
