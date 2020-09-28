@@ -361,7 +361,10 @@ def make_graph(premises):
         else:
             pred_name = premise.split(' ')[0]
             arg = premise.split(' ')[1:]
-            graph.addPred(pred_name, arg)
+            if len(arg) == 1:
+                graph.addPred(pred_name, arg)
+            elif len(arg) == 2:
+                graph.addPreposition(pred_name, arg)
     return graph
 
 
@@ -404,24 +407,26 @@ def create_axioms(premises, subgoals):
     graph = make_graph(premises)
     for subgoal in subgoals:
         if is_sr(subgoal):
-            assert '=' in conclucion
-            x, y = conclusion.split(' = ')
-            axiom = f'{get_name(graph.get_e(x))} -> {get_name(graph.get_e(y))}'
+            assert '=' in subgoal
+            x, y = subgoal.split(' = ')
+            axiom = f'{graph.get_e(x).get_pred_str()} = {graph.get_e(y).get_pred_str()}'
         else:
             arg = get_tree_pred_args2(subgoal, is_conclusion=True)
-            axiom_premise = ' & '.join(
-                [graph.get_e(a).get_pred_str() for a in arg])
-            axiom = f'{axiom_premise} -> {subgoal}'
+            if len(arg) == 1:
+                axiom_premise = graph.get_e(arg[0]).get_pred_str()
+            else:
+                for a in arg:
+                    e = graph.get_e(a)
+                    if isinstance(e, Event):
+                        axiom_premise = e.get_pred_str()
+                        subgoal = f'{e.get_pred_str(subj=False)} & {subgoal}'
+                    elif isinstance(e, Entity):
+                        subgoal = f'{e.get_pred_str()} & {subgoal}'
+                    else:
+                        raise ValueError()
+
+            axiom = f'{axiom_premise} & {subgoal}'
         result.append(axiom)
-    return result
-
-
-def get_prep_arg(p):
-    result = []
-    for e in p.args:
-        for pred in e.predicates:
-            if pred.name != p.name:
-                result.append(pred.name)
     return result
 
 
@@ -503,6 +508,9 @@ def preprocess(premises, conclusion, subgoals_original):
 
     # Filter H
     result = [x.split(' : ')[1] if x.startswith('H') else x for x in result]
+
+    # one argument predicate comes in front
+    result = sorted(result, key=lambda x: len(x.split(' ')))
 
     # merge conclucion and subgoals
     return result, subgoals
