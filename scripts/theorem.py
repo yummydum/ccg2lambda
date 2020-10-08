@@ -96,6 +96,18 @@ class Theorem(object):
         theorem.doc = doc
         return theorem
 
+    def pos_from_doc(self, doc):
+        self.pos = OrderedDict()
+        tokens = doc.xpath('./sentences/sentence[1]/tokens')[0]
+        for tok in tokens:
+            self.pos[tok.attrib.get('base')] = tok.attrib.get('pos')
+
+        tokens = doc.xpath('./sentences/sentence[2]/tokens')[0]
+        self.pos2 = OrderedDict()
+        for tok in tokens:
+            self.pos2[tok.attrib.get('base')] = tok.attrib.get('pos')
+        return
+
     def copy(self,
              new_premises=None,
              new_conclusion=None,
@@ -216,7 +228,7 @@ class Theorem(object):
             abduction.attempt(self)
 
         # Accumulate failure info
-        self.created_axioms = get_matched_premises(self.output_lines)
+        self.created_axioms = get_matched_premises(self)
 
         # Reverse theorem
         rev_theorem = self.reverse()
@@ -519,6 +531,7 @@ class MasterTheorem(Theorem):
                 doc, semantics)
             premises, conclusion = formulas[:-1], formulas[-1]
             theorem = Theorem(premises, conclusion, set(), dynamic_library_str)
+            theorem.pos_from_doc(doc)
             labels = [(s.get('ccg_id', None), s.get('ccg_parser', None))
                       for s in semantics]
             theorem.labels = labels

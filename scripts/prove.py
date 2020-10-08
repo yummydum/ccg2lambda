@@ -90,8 +90,9 @@ def prove(args):
                 fout.write('Conclusion:\n')
                 fout.write(hypothesis + '\n\n')
                 fout.write('Axioms:\n')
-                for axiom in created_axioms:
+                for axiom, text in created_axioms:
                     fout.write(axiom + '\n')
+                    fout.write(text + '\n\n')
     return
 
 

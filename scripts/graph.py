@@ -4,10 +4,10 @@ class Graph:
         self.events = dict()
         self.predicate = dict()
 
-    def addPred(self, name, arg):
+    def addPred(self, name, pos, arg):
         if name in self.predicate:
             name = f'{name}_2'  # fix this
-        pred = Predicate(name, arg, self)
+        pred = Predicate(name, pos, arg, self)
         self.predicate[pred.name] = pred
         return
 
@@ -56,8 +56,9 @@ class Graph:
 
 
 class Predicate():
-    def __init__(self, name, arg, graph):
+    def __init__(self, name, pos, arg, graph):
         self.name = name
+        self.pos = pos
         self.graph = graph
         self.arg = None
         self.add_arg(arg)
@@ -104,6 +105,7 @@ class Preposition():
         self.graph = graph
         self.entity = None
         self.event = None
+        self.pos = 'PP'
         assert isinstance(args, list) and len(args) == 2
         self.add_arg(args)
 
@@ -151,20 +153,47 @@ class Entity:
         self.predicates.append(p)
         return
 
-    def get_pred_str(self):
-        acc = []
-        for p in self.predicates:
-            if isinstance(p, Predicate):
-                acc.append(f'{p.name} {self.name}')
-        return ' & '.join(acc)
+    def pos_order(self, pred):
+        if pred.pos.startswith('NN'):
+            return 1
+        elif pred.pos.startswith('JJ'):
+            return 0
+        elif pred.pos.startswith('CD'):
+            return -1
+        elif pred.pos == 'PP':
+            return -2
+        else:
+            raise ValueError()
 
-    def get_prop_str(self):
-        acc = []
-        for p in self.predicates:
-            if isinstance(p, Preposition):
-                prop_str = f'{p.event.get_pred_str()} & {p.event.get_pred_str(subj=False)} & {p.entity.get_pred_str()} & {p.name} {p.entity} {p.event}'
-                acc.append(prop_str)
-        return ' & '.join(acc)
+    def get_pred_str(self, with_ent=True):
+        if with_ent:
+            acc = []
+            for p in self.predicates:
+                if isinstance(p, Predicate):
+                    acc.append(f'{p.name} {self.name}')
+            return ' & '.join(acc)
+        else:
+            acc = []
+            for p in sorted(self.predicates, key=self.pos_order):
+                if isinstance(p, Predicate):
+                    acc.append(p.name)
+            return ' '.join(acc)
+
+    def get_prop_str(self, with_ent=True):
+        if with_ent:
+            acc = []
+            for p in self.predicates:
+                if isinstance(p, Preposition):
+                    prop_str = f'{p.event.get_pred_str()} & {p.event.get_pred_str(subj=False)} & {p.entity.get_pred_str()} & {p.name} {p.entity} {p.event}'
+                    acc.append(prop_str)
+            return ' & '.join(acc)
+        else:
+            acc = []
+            for p in self.predicates:
+                if isinstance(p, Preposition):
+                    prop_str = f'{p.event.get_pred_str(with_ent=False)} & {p.event.get_pred_str(subj=False,with_ent=False)} & {p.entity.get_pred_str(with_ent=False)} & {p.name} {p.entity} {p.event}'
+                    acc.append(prop_str)
+            return ' '.join(acc)
 
     def __repr__(self):
         return self.get_pred_str()
@@ -177,6 +206,14 @@ class Event:
         self.name = f'e{self.i}'
         return
 
+    def pos_order(self, pred):
+        if pred.pos.startswith('V'):
+            return 0
+        elif pred.pos.startswith('RB'):
+            return 1
+        else:
+            raise ValueError()
+
     def addPred(self, p):
         assert isinstance(p, Predicate) or isinstance(p, Preposition)
         self.predicates.append(p)
@@ -186,23 +223,41 @@ class Event:
         assert isinstance(x, Entity) and not hasattr(self, name)
         setattr(self, name.lower(), x)
 
-    def get_pred_str(self, subj=True):
-        if subj:
-            return f'Subj({self.name}) = {self.subj.name} & {self.subj.get_pred_str()}'
+    def get_pred_str(self, subj=True, with_ent=True):
+        if with_ent:
+            if subj:
+                return f'Subj({self.name}) = {self.subj.name} & {self.subj.get_pred_str()}'
+            else:
+                acc = []
+                for p in self.predicates:
+                    if isinstance(p, Predicate):
+                        acc.append(f'{p.name} {self.name}')
+                return ' & '.join(acc)
+        else:
+            if subj:
+                return self.subj.get_pred_str(with_ent=False)
+            else:
+                acc = []
+                for p in sorted(self.predicates, key=self.pos_order):
+                    if isinstance(p, Predicate):
+                        acc.append(p.name)
+                return ' '.join(acc)
+
+    def get_prop_str(self, with_ent=True):
+        if with_ent:
+            acc = []
+            for p in self.predicates:
+                if isinstance(p, Preposition):
+                    prop_str = f'{p.event.get_pred_str()} & {p.event.get_pred_str(subj=False)} & {p.entity.get_pred_str()} & {p.name} {p.entity} {p.event}'
+                    acc.append(prop_str)
+            return ' & '.join(acc)
         else:
             acc = []
             for p in self.predicates:
-                if isinstance(p, Predicate):
-                    acc.append(f'{p.name} {self.name}')
-            return ' & '.join(acc)
-
-    def get_prop_str(self):
-        acc = []
-        for p in self.predicates:
-            if isinstance(p, Preposition):
-                prop_str = f'{p.event.get_pred_str()} & {p.event.get_pred_str(subj=False)} & {p.entity.get_pred_str()} & {p.name} {p.entity} {p.event}'
-                acc.append(prop_str)
-        return ' & '.join(acc)
+                if isinstance(p, Preposition):
+                    prop_str = f'{p.event.get_pred_str(with_ent=False)} & {p.event.get_pred_str(subj=False,with_ent=False)} & {p.entity.get_pred_str(with_ent=False)} & {p.name} {p.entity} {p.event}'
+                    acc.append(prop_str)
+            return ' '.join(acc)
 
     def __repr__(self):
         return self.get_pred_str(subj=False)
