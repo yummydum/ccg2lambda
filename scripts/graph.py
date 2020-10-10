@@ -165,7 +165,7 @@ class Entity:
         else:
             raise ValueError()
 
-    def get_pred_str(self, with_ent=True):
+    def get_pred_str(self, with_ent=False):
         if with_ent:
             acc = []
             for p in self.predicates:
@@ -179,7 +179,7 @@ class Entity:
                     acc.append(p.name)
             return ' '.join(acc)
 
-    def get_prop_str(self, with_ent=True):
+    def get_prop_str(self, with_ent=False):
         if with_ent:
             acc = []
             for p in self.predicates:
@@ -223,7 +223,7 @@ class Event:
         assert isinstance(x, Entity) and not hasattr(self, name)
         setattr(self, name.lower(), x)
 
-    def get_pred_str(self, subj=True, with_ent=True):
+    def get_pred_str(self, subj=True, with_ent=False):
         if with_ent:
             if subj:
                 return f'Subj({self.name}) = {self.subj.name} & {self.subj.get_pred_str()}'
@@ -243,7 +243,7 @@ class Event:
                         acc.append(p.name)
                 return ' '.join(acc)
 
-    def get_prop_str(self, with_ent=True):
+    def get_prop_str(self, with_ent=False):
         if with_ent:
             acc = []
             for p in self.predicates:
