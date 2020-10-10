@@ -451,11 +451,15 @@ def create_axioms(theorem, premises, subgoals):
     result = []
     graph = make_graph(theorem, premises)
     for subgoal in subgoals:
-        if is_sr(subgoal):
-            assert '=' in subgoal
-            x, y = subgoal.split(' = ')
-            axiom = f'{graph.get_e(x).get_pred_str()} = {graph.get_e(y).get_pred_str()}'
+
+        if subgoal.startswith('_at'):
             breakpoint()
+
+        if is_sr(subgoal):
+            sr, evt, _, ent = subgoal.split(' ')
+            evt = graph.get_e(evt)
+            ent = graph.get_e(ent)
+            axiom = f'The {getattr(evt,sr.lower()).get_pred_str()} is {ent.get_pred_str()}'
         else:
             arg = get_tree_pred_args2(subgoal, is_conclusion=True)
             if len(arg) == 1:
@@ -466,24 +470,25 @@ def create_axioms(theorem, premises, subgoals):
             elif len(arg) == 2:
 
                 # Make subgoal text
-                subgoal_text = subgoal.split(' ')[0]
+                subgoal_text = subgoal.split(' ')[0].lstrip('_')
                 assert arg[0].startswith('e') and arg[1].startswith('x')
 
                 # Event
                 e = graph.get_e(arg[0])
-                subgoal_text = f'{event2str(e)} {subgoal_text}'
+                subgoal_text = f'{event2string(e)} {subgoal_text}'
 
                 # Entity
                 e = graph.get_e(arg[1])
-                subgoal_text = f'{subgoal_text} {entity2str(e)}'
+                subgoal_text = f'{subgoal_text} {entity2string(e)}'
             else:
                 raise ValueError()
+            axiom = f'The {e.get_pred_str()} is {subgoal_text}'
 
-        result.append(f'The {e.get_pred_str()} is {subgoal_text}')
+        result.append(axiom)
     return result
 
 
-def event2str(e):
+def event2string(e):
     event_str = e.get_pred_str(subj=False)
     splitted = event_str.split(' ')
     event_str = transform(splitted[0], 'V')
@@ -492,7 +497,7 @@ def event2str(e):
     return event_str
 
 
-def entity2str(e):
+def entity2string(e):
     splitted = e.get_pred_str().split(' ')
     ent_str = transform(splitted[-1], 'NN')
     if len(splitted) > 1:

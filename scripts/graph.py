@@ -212,7 +212,7 @@ class Event:
         elif pred.pos.startswith('RB'):
             return 1
         else:
-            raise ValueError()
+            return 2
 
     def addPred(self, p):
         assert isinstance(p, Predicate) or isinstance(p, Preposition)
