@@ -35,11 +35,12 @@ def main():
     parser.add_argument("sem", type=Path)
     parser.add_argument("--abduction", type=str, choices=["naive", "spsa"])
     parser.add_argument("--timeout", type=int, default=100)
-    parser.add_argument("--subgoals", action="store_true", default=False)
+    parser.add_argument("--write", action="store_true", default=False)
     parser.add_argument("--bidirection", action="store_true", default=False)
     parser.add_argument("--gold_trees", action="store_true", default=True)
     parser.add_argument("--sick_all", action="store_true")
     args = parser.parse_args()
+    args.subgoals = True
 
     logging.basicConfig(level=logging.WARNING)
 
@@ -68,7 +69,8 @@ def main():
             except:
                 continue
     else:
-        prove(args)
+        created_axioms = prove(args)
+        return created_axioms
 
 
 def prove(args):
@@ -80,7 +82,7 @@ def prove(args):
         premise = clean(theorem.theorems[0].premises[0])
         hypothesis = clean(theorem.theorems[0].conclusion)
         created_axioms = theorem.theorems[0].created_axioms
-        if args.subgoals:
+        if args.write:
             ab_output = str(args.sem).replace('parsed',
                                               'subgoal_matched').replace(
                                                   '.sem.xml', '.txt')
@@ -92,7 +94,7 @@ def prove(args):
                 fout.write('Axioms:\n')
                 for text in created_axioms:
                     fout.write(text + '\n')
-    return
+    return created_axioms
 
 
 if __name__ == '__main__':
