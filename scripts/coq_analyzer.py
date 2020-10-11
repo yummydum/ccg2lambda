@@ -353,6 +353,7 @@ def get_predicate_arguments(premises, conclusion):
 
 def make_graph(theorem, premises):
     graph = Graph()
+    original_text = list(theorem.pos.keys())
     for premise in premises:
         if '=' in premise:
             premise = premise.replace('=', '')
@@ -363,7 +364,8 @@ def make_graph(theorem, premises):
             arg = premise.split(' ')[1:]
             if len(arg) == 1:
                 pos = theorem.pos[pred_name]
-                graph.addPred(pred_name, pos, arg)
+                i = original_text.index(pred_name)
+                graph.addPred(i, pred_name, pos, arg)
             elif len(arg) == 2:
                 graph.addPreposition(pred_name, arg)
     return graph
@@ -406,16 +408,24 @@ def is_sr(e):
 
 
 def format_subgoal(theorem, subgoal):
+
     subgoal = subgoal.lstrip('_')
     text, e = subgoal.split(' ')
 
     # merged because of ununified variable (prop + pred)
     if '_' in text:
-        if len(text.split('_')) == 3:
-            text = '_'.join(text.split('_')[:-1])
-        x, text = text.split('_')
-        pos = theorem.pos2[text]
+        x = text.split('_')[0]
         pos2 = theorem.pos2[x]
+        text = '_'.join(text.split('_')[1:])
+        if '_' in text:
+            if text.split('_')[-1] in theorem.pos2:
+                pos = theorem.pos2[text.split('_')[-1]]
+            elif text.split('_')[0] in theorem.pos2:
+                pos = theorem.pos2[text.split('_')[0]]
+            else:
+                raise ValueError()
+        else:
+            pos = theorem.pos2[text]
         return f'{transform(x,pos2)} {transform(text,pos)}'
     # single pred
     else:
@@ -424,6 +434,10 @@ def format_subgoal(theorem, subgoal):
 
 
 def transform(pred, pos):
+
+    if '_' in pred:
+        pred = pred.replace('_', ' ')
+
     if pos.startswith('V'):
         return progressive(pred)
     elif pos.startswith('JJ'):
@@ -476,7 +490,7 @@ def create_axioms(theorem, premises, subgoals):
 
                 # Entity
                 ent = graph.get_e(arg[1])
-                subgoal_text = f'{subgoal_text} {entity2string(ent)}'
+                subgoal_text = f'{subgoal_text} a {ent}'
 
                 axiom = f'The {evt.get_pred_str(subj=True)} is {subgoal_text}'
             else:
@@ -495,22 +509,14 @@ def event2string(e):
     return event_str
 
 
-def entity2string(e):
-    splitted = e.get_pred_str().split(' ')
-    ent_str = transform(splitted[-1], 'NN')
-    if len(splitted) > 1:
-        ent_str = f"{' '.join(splitted[:-1])} {ent_str}"
-    return ent_str
-
-
 def preprocess_subgoal(theorem, premises, subgoals):
 
-    sr_list = []
+    sr_list = set()
     for p in premises:
         if is_sr(p):
             sr, e1, _, e2 = p.split(' ')
             if sr == 'Acc':
-                sr_list.append((e1, e2))
+                sr_list.add((e1, e2))
 
     ents = set()
     var2pred = {}
@@ -534,7 +540,7 @@ def preprocess_subgoal(theorem, premises, subgoals):
             pred, arg = goal.split(' ')
             if arg in var2pred:
                 preds = sort_by_pos(theorem, var2pred[arg])
-                pred = f"{pred}{'_'.join(preds)}"
+                pred = f"{pred}{preds}"
             result2.append(f'{pred} {arg}')
         else:
             result2.append(goal)

@@ -4,10 +4,10 @@ class Graph:
         self.events = dict()
         self.predicate = dict()
 
-    def addPred(self, name, pos, arg):
+    def addPred(self, i, name, pos, arg):
         if name in self.predicate:
             name = f'{name}_2'  # fix this
-        pred = Predicate(name, pos, arg, self)
+        pred = Predicate(i, name, pos, arg, self)
         self.predicate[pred.name] = pred
         return
 
@@ -56,7 +56,8 @@ class Graph:
 
 
 class Predicate():
-    def __init__(self, name, pos, arg, graph):
+    def __init__(self, i, name, pos, arg, graph):
+        self.i = i
         self.name = name
         self.pos = pos
         self.graph = graph
@@ -155,13 +156,13 @@ class Entity:
 
     def pos_order(self, pred):
         if pred.pos.startswith('NN'):
-            return 1
+            return 200 + pred.i
         elif pred.pos.startswith('JJ'):
-            return 0
+            return 100 + pred.i
         elif pred.pos.startswith('CD'):
-            return -1
+            return -100 + pred.i
         elif pred.pos == 'PP':
-            return -2
+            return -200 + pred.i
         else:
             raise ValueError()
 
@@ -208,11 +209,11 @@ class Event:
 
     def pos_order(self, pred):
         if pred.pos.startswith('V'):
-            return 0
+            return 100 + pred.i
         elif pred.pos.startswith('RB'):
-            return 1
+            return 200 + pred.i
         else:
-            return 2
+            return 300 + pred.i
 
     def addPred(self, p):
         assert isinstance(p, Predicate) or isinstance(p, Preposition)
