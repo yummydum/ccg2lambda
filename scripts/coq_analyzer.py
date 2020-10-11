@@ -362,12 +362,12 @@ def make_graph(theorem, premises):
         else:
             pred_name = premise.split(' ')[0].split('_')[1]
             arg = premise.split(' ')[1:]
+            i = original_text.index(pred_name)
             if len(arg) == 1:
                 pos = theorem.pos[pred_name]
-                i = original_text.index(pred_name)
                 graph.addPred(i, pred_name, pos, arg)
             elif len(arg) == 2:
-                graph.addPreposition(pred_name, arg)
+                graph.addPreposition(i, pred_name, arg)
     return graph
 
 
@@ -408,6 +408,8 @@ def is_sr(e):
 
 
 def format_subgoal(theorem, subgoal):
+
+    breakpoint()
 
     subgoal = subgoal.lstrip('_')
     text, e = subgoal.split(' ')

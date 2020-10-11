@@ -11,10 +11,10 @@ class Graph:
         self.predicate[pred.name] = pred
         return
 
-    def addPreposition(self, name, args):
+    def addPreposition(self, i, name, args):
         if name in self.predicate:
             name = f'{name}_2'  # fix this
-        pred = Preposition(name, args, self)
+        pred = Preposition(i, name, args, self)
         self.predicate[pred.name] = pred
         return
 
@@ -101,7 +101,8 @@ class Predicate():
 
 
 class Preposition():
-    def __init__(self, name, args, graph):
+    def __init__(self, i, name, args, graph):
+        self.i = i
         self.name = name
         self.graph = graph
         self.entity = None
