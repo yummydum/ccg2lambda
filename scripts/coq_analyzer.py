@@ -409,8 +409,6 @@ def is_sr(e):
 
 def format_subgoal(theorem, subgoal):
 
-    breakpoint()
-
     subgoal = subgoal.lstrip('_')
     text, e = subgoal.split(' ')
 
