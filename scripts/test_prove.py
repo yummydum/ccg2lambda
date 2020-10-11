@@ -82,3 +82,7 @@ def test_prove_1161(monkeypatch):
     ])
     axioms = main()
     return
+
+
+def test_prove_139(monkeypatch):
+    return

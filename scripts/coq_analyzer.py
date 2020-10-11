@@ -633,6 +633,18 @@ def preprocess_sr(premises, subgoals):
         else:
             ValueError()
 
+    max_ind = 1000
+    for i in range(len(subgoals)):
+        temp = f'H : {subgoals[i]}'
+        arg = get_tree_pred_args2(temp)
+        if isinstance(arg, Tree):
+            label = arg.label()
+            event = arg.leaves()[0]
+            original = f'({label} {event})'
+            ent = f'x{max_ind}'
+            subgoals[i] = subgoals[i].replace(original, ent)
+            max_ind += 1
+
     return result, subgoals
 
 

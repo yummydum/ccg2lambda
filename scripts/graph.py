@@ -54,6 +54,9 @@ class Graph:
             else:
                 raise ValueError()
 
+    def get_subgoals(self):
+        return
+
 
 class Predicate():
     def __init__(self, i, name, pos, arg, graph):
@@ -163,7 +166,10 @@ class Entity:
         elif pred.pos.startswith('CD'):
             return -100 + pred.i
         elif pred.pos == 'PP':
+            breakpoint()
             return -200 + pred.i
+        elif pred.pos.startswith('RB'):
+            return 300 + pred.i
         else:
             raise ValueError()
 
