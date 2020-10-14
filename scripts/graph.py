@@ -12,14 +12,26 @@ class Graph:
         return
 
     def addRelation(self, event, entity, name):
+
+        unmatched = entity.startswith('?')
+        if unmatched:
+            entity = entity.lstrip('?')
+
         t_e, i_e = parse(event)
         t_x, i_x = parse(entity)
+
+        if unmatched:
+            i_x += 1000
+
         event = self.events[i_e]
         entity = self.entities[i_x]
         self.events[event.i].addRelation(entity, name)
+
         if event.matched_by is not None:
-            i = entity.i + 1000
-            entity = self.entities[i]
+            if entity.i + 1000 in self.entities:
+                entity = self.entities[entity.i + 1000]
+            else:
+                entity = self.entities[entity.i]
             self.events[event.matched_by.i].addRelation(entity, name)
         return
 
@@ -104,9 +116,9 @@ class Predicate():
 
                 if subgoal and matched:
                     matched_e = self.graph.events[i]
-                    i = i + 1000
+                    i += 1000
                 elif subgoal and not matched:
-                    i = i + 1000
+                    i += 1000
                 else:
                     pass
 
@@ -121,10 +133,13 @@ class Predicate():
             elif t == 'x':
 
                 if subgoal and matched:
+                    if i == 200:
+                        breakpoint()
+
                     matched_e = self.graph.entities[i]
-                    i = i + 1000
+                    i += 1000
                 elif subgoal and not matched:
-                    i = i + 1000
+                    i += 1000
                 else:
                     pass
 
@@ -241,7 +256,7 @@ class Event:
                 verb += f' a {acc}'
             if hasattr(self, 'dat'):
                 dat = self.dat.get_pred_str()
-                verb += f' to {dat}'
+                verb += f' to a {dat}'
         return verb
 
     def get_prop_str(self):
@@ -260,7 +275,13 @@ class Event:
 
 def parse(x):
     assert isinstance(x, str)
-    return x[0], int(x[1:])
+    t = x[0]
+    i = x[1:]
+    if i == '':
+        i = 9999
+    else:
+        i = int(i)
+    return t, i
 
 
 def format_pred(p):

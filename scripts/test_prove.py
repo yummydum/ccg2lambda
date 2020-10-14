@@ -62,19 +62,23 @@ def test_prove_186(monkeypatch):
     return
 
 
-# def test_prove_1135(monkeypatch):
-#     monkeypatch.setattr('sys.argv', [
-#         'scripts/prove.py', 'data/parsed/pair_1135.sem.xml', '--write',
-#         '--abduction', 'spsa'
-#     ])
-#     axioms = main()
-#     return
+def test_prove_1135(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_1135.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms = main()
+    assert axioms[0] == 'The turtle is a sea'
+    assert axioms[1] == 'The turtle is huntting a fish for a food'
+    return
 
 
-# def test_prove_1161(monkeypatch):
-#     monkeypatch.setattr('sys.argv', [
-#         'scripts/prove.py', 'data/parsed/pair_1161.sem.xml', '--write',
-#         '--abduction', 'spsa'
-#     ])
-#     axioms = main()
-#     return
+def test_prove_1161(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_1161.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms = main()
+    assert axioms[0] == 'The egg is a ingredient'
+    assert axioms[1] == 'The woman is adding a ingredient to a bowl '
+    return

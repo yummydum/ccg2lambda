@@ -378,7 +378,8 @@ def make_graph(theorem, premises, subgoals):
 
     for goal in subgoals:
         if '=' in goal:
-            breakpoint()
+            name, event, _, entity = goal.split()
+            graph.addRelation(event, entity, name)
     return graph
 
 
@@ -457,10 +458,10 @@ def preprocess_sr(premises, subgoals):
             label = arg.label()
             event = arg.leaves()[0]
             original = f'({label} {event})'
-            ent = f'x{max_ind}'
+            ent = f'?x{max_ind}'
             subgoals[i] = subgoals[i].replace(original, ent)
             max_ind += 1
-
+            subgoals.append(f'{label} {event} = {ent}')
     return result, subgoals
 
 
