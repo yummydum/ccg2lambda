@@ -149,6 +149,7 @@ class Predicate():
         return
 
     def add_arg(self, args, subgoal):
+
         assert isinstance(args, list)
 
         for arg in args:
@@ -165,8 +166,10 @@ class Predicate():
                 if subgoal and matched:
                     matched_e = self.graph.events[i]
                     i += 1000
+
+                # ?e
                 elif subgoal and not matched:
-                    i += 1000
+                    i += 500
                 else:
                     pass
 
@@ -183,11 +186,11 @@ class Predicate():
                 if subgoal and matched:
                     if i == 200:
                         breakpoint()
-
                     matched_e = self.graph.entities[i]
                     i += 1000
+                # ?x
                 elif subgoal and not matched:
-                    i += 1000
+                    i += 500
                 else:
                     pass
 
@@ -335,7 +338,7 @@ def parse(x):
     t = x[0]
     i = x[1:]
     if i == '':
-        i = 9999
+        i = 999
     else:
         i = int(i)
     return t, i
