@@ -351,23 +351,34 @@ def get_predicate_arguments(premises, conclusion):
     return pred_args
 
 
-def make_graph(theorem, premises):
+def make_graph(theorem, premises, subgoals):
     graph = Graph()
     original_text = list(theorem.pos.keys())
     for premise in premises:
-        if '=' in premise:
-            premise = premise.replace('=', '')
-            name, event, entity = premise.split()
-            graph.addRelation(event, entity, name)
-        else:
+        if '=' not in premise:
             pred_name = premise.split(' ')[0].split('_')[1]
             arg = premise.split(' ')[1:]
             i = original_text.index(pred_name)
-            if len(arg) == 1:
-                pos = theorem.pos[pred_name]
-                graph.addPred(i, pred_name, pos, arg)
-            elif len(arg) == 2:
-                graph.addPreposition(i, pred_name, arg)
+            pos = theorem.pos[pred_name]
+            graph.addPred(i, pred_name, pos, arg, subgoal=False)
+
+    original_text = list(theorem.pos2.keys())
+    for goal in subgoals:
+        if '=' not in goal:
+            pred_name = goal.split(' ')[0].split('_')[1]
+            arg = goal.split(' ')[1:]
+            i = original_text.index(pred_name)
+            pos = theorem.pos2[pred_name]
+            graph.addPred(i, pred_name, pos, arg, subgoal=True)
+
+    for premise in premises:
+        if '=' in premise:
+            name, event, _, entity = premise.split()
+            graph.addRelation(event, entity, name)
+
+    for goal in subgoals:
+        if '=' in goal:
+            breakpoint()
     return graph
 
 
@@ -378,11 +389,12 @@ def get_matched_premises(theorem):
     subgoals = get_subgoals_from_coq_output2(output_lines)
     premises, subgoals = preprocess(theorem, premise_lines, conclusion,
                                     subgoals)
+    graph = make_graph(theorem, premises, subgoals)
     if not premise_lines:
         raise ValueError('Type error')
     elif not subgoals:  # proved?
         return {}
-    return create_axioms(theorem, premises, subgoals)
+    return graph.create_axioms()
 
 
 def get_subgoals_from_coq_output2(coq_output_lines):
@@ -400,202 +412,6 @@ def get_subgoals_from_coq_output2(coq_output_lines):
             is_subgoal = False
 
     return subgoals
-
-
-def is_sr(e):
-    return isinstance(
-        e, str) and e.split(' ')[0].lower() in {'subj', 'acc', 'dat'}
-
-
-def format_subgoal(theorem, subgoal):
-
-    subgoal = subgoal.lstrip('_')
-    text, e = subgoal.split(' ')
-
-    # merged because of ununified variable (prop + pred)
-    if '_' in text:
-        x = text.split('_')[0]
-        pos2 = theorem.pos2[x]
-        text = '_'.join(text.split('_')[1:])
-        if '_' in text:
-            if text.split('_')[-1] in theorem.pos2:
-                pos = theorem.pos2[text.split('_')[-1]]
-            elif text.split('_')[0] in theorem.pos2:
-                pos = theorem.pos2[text.split('_')[0]]
-            else:
-                raise ValueError()
-        else:
-            pos = theorem.pos2[text]
-        return f'{transform(x,pos2)} {transform(text,pos)}'
-    # single pred
-    else:
-        pos = theorem.pos2[text]
-        return transform(text, pos)
-
-
-def transform(pred, pos):
-
-    if '_' in pred:
-        pred = pred.replace('_', ' ')
-
-    if pos.startswith('V'):
-        return progressive(pred)
-    elif pos.startswith('JJ'):
-        return pred
-    elif pos.startswith('NN'):
-        return f'a {pred}'
-    elif pos.startswith('RB'):
-        return pred
-    else:
-        return pred
-
-
-def progressive(name):
-    # TODO change this to spacy or nltk or something
-    if name.endswith('ing'):
-        return name
-    if name.endswith('t'):
-        name = name + 't'
-    elif name.endswith('e'):
-        name = name.rstrip('e')
-    return name + 'ing'
-
-
-def create_axioms(theorem, premises, subgoals):
-    result = []
-    graph = make_graph(theorem, premises)
-    for subgoal in subgoals:
-
-        if is_sr(subgoal):
-            sr, evt, _, ent = subgoal.split(' ')
-            evt = graph.get_e(evt)
-            ent = graph.get_e(ent)
-            axiom = f'The {getattr(evt,sr.lower()).get_pred_str()} is {ent.get_pred_str()}'
-        else:
-            arg = get_tree_pred_args2(subgoal, is_conclusion=True)
-            if len(arg) == 1:
-                e = graph.get_e(arg[0])
-                subgoal_text = format_subgoal(theorem, subgoal)
-                axiom = f'The {e.get_pred_str()} is {subgoal_text}'
-            # Preposition
-            elif len(arg) == 2:
-
-                # Make subgoal text
-                subgoal_text = subgoal.split(' ')[0].lstrip('_')
-                assert arg[0].startswith('e') and arg[1].startswith('x')
-
-                # Event
-                evt = graph.get_e(arg[0])
-                subgoal_text = f'{event2string(evt)} {subgoal_text}'
-
-                # Entity
-                ent = graph.get_e(arg[1])
-                subgoal_text = f'{subgoal_text} a {ent}'
-
-                axiom = f'The {evt.get_pred_str(subj=True)} is {subgoal_text}'
-            else:
-                raise ValueError()
-
-        result.append(axiom)
-    return result
-
-
-def event2string(e):
-    event_str = e.get_pred_str(subj=False)
-    splitted = event_str.split(' ')
-    event_str = transform(splitted[0], 'V')
-    if len(splitted) > 1:
-        event_str = f"{event_str} {' '.join(splitted[1:])}"
-    return event_str
-
-
-def preprocess_subgoal(theorem, premises, subgoals):
-
-    sr_list = set()
-    for p in premises:
-        if is_sr(p):
-            sr, e1, _, e2 = p.split(' ')
-            if sr == 'Acc':
-                sr_list.add((e1, e2))
-
-    ents = set()
-    var2pred = {}
-    for e1, e2 in sr_list:
-        assert e1.startswith('e')
-        assert e2.startswith('x')
-        ents.add(e2)
-        for goal in subgoals:
-            if len(goal.split(' ')) == 2:
-                pred, arg = goal.split(' ')
-                if arg == e2:
-                    if e1 not in var2pred:
-                        var2pred[e1] = []
-                    var2pred[e1].append(pred)
-
-    result2 = []
-    for goal in subgoals:
-        assert e1.startswith('e')
-        assert e2.startswith('x')
-        if len(goal.split(' ')) == 2:
-            pred, arg = goal.split(' ')
-            if arg in var2pred:
-                preds = sort_by_pos(theorem, var2pred[arg])
-                pred = f"{pred}{preds}"
-            result2.append(f'{pred} {arg}')
-        else:
-            result2.append(goal)
-
-    subgoals = result2
-
-    result = []
-    var2pred = {}
-    for goal in sorted(subgoals, key=lambda x: len(x.split(' '))):
-        goal = goal.replace('?z', '?x100').replace('?e', '?x200')
-        # handle ununified variables
-        if '?x' in goal:
-            pred = goal.split(' ')[0]
-            pred = '_'.join(pred.split('_')[0:2])
-            args = goal.split(' ')[1:]
-
-            # Pred
-            if len(args) == 1:
-                var = args[0]
-                if var not in var2pred:
-                    var2pred[var] = []
-                var2pred[var].append(pred)
-                continue
-
-            # Preposition
-            elif len(args) == 2:
-
-                new_arg = args[0]
-                unun_arg = args[1]
-                assert '?x' in unun_arg
-
-                preds = sort_by_pos(theorem, var2pred[unun_arg])
-                goal = f'{pred}{preds} {new_arg}'
-            else:
-                raise ValueError()
-
-        result.append(goal)
-    return result
-
-
-def sort_by_pos(theorem, preds):
-    def pos_order(pred):
-        pred = pred.lstrip('_')
-        pos = theorem.pos2[pred]
-        if pos.startswith('V'):
-            return 3
-        elif pos.startswith('JJ'):
-            return 1
-        elif pos.startswith('NN'):
-            return 2
-        else:
-            return 0
-
-    result = "_".join(sorted(preds, key=lambda x: pos_order(x)))
-    return result.replace('__', '_')
 
 
 def preprocess_sr(premises, subgoals):
@@ -633,7 +449,7 @@ def preprocess_sr(premises, subgoals):
         else:
             ValueError()
 
-    max_ind = 1000
+    max_ind = 200
     for i in range(len(subgoals)):
         temp = f'H : {subgoals[i]}'
         arg = get_tree_pred_args2(temp)
@@ -674,7 +490,6 @@ def preprocess(theorem, premises, conclusion, subgoals):
 
     premises, subgoals = preprocess_variables(premises, subgoals)
     premises, subgoals = preprocess_sr(premises, subgoals)
-    subgoals = preprocess_subgoal(theorem, premises, subgoals)
 
     # Filter H
     premises = [
@@ -683,6 +498,7 @@ def preprocess(theorem, premises, conclusion, subgoals):
 
     # one argument predicate comes in front
     premises = sorted(premises, key=lambda x: len(x.split(' ')))
+    subgoals = sorted(subgoals, key=lambda x: len(x.split(' ')))
 
     # merge conclucion and subgoals
     return premises, subgoals

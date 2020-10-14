@@ -4,17 +4,10 @@ class Graph:
         self.events = dict()
         self.predicate = dict()
 
-    def addPred(self, i, name, pos, arg):
+    def addPred(self, i, name, pos, arg, subgoal):
         if name in self.predicate:
             name = f'{name}_2'  # fix this
-        pred = Predicate(i, name, pos, arg, self)
-        self.predicate[pred.name] = pred
-        return
-
-    def addPreposition(self, i, name, args):
-        if name in self.predicate:
-            name = f'{name}_2'  # fix this
-        pred = Preposition(i, name, args, self)
+        pred = Predicate(i, name, pos, arg, subgoal, self)
         self.predicate[pred.name] = pred
         return
 
@@ -24,6 +17,10 @@ class Graph:
         event = self.events[i_e]
         entity = self.entities[i_x]
         self.events[event.i].addRelation(entity, name)
+        if event.matched_by is not None:
+            i = entity.i + 1000
+            entity = self.entities[i]
+            self.events[event.matched_by.i].addRelation(entity, name)
         return
 
     def addEntity(self, e):
@@ -36,42 +33,50 @@ class Graph:
         self.events[e.i] = e
         return
 
-    def get_e(self, e: str):
-        assert isinstance(e, str)
-        if e.split(' ')[0].lower() in {'subj', 'acc', 'dat'}:
-            sr, e_ = e.split(' ')
-            sr = sr.lower()
-            t, i = parse(e_)
-            evt = self.get_e(e_)
-            assert t == 'e' and hasattr(evt, sr)
-            return getattr(evt, sr)
-        else:
-            t, i = parse(e)
-            if t == 'x':
-                return self.entities[i]
-            elif t == 'e':
-                return self.events[i]
-            else:
-                raise ValueError()
+    def create_axioms(self):
+        result = []
+        result += self.from_matched_entities()
+        result += self.from_matched_events()
+        return result
 
-    def get_subgoals(self):
-        return
+    def from_matched_entities(self):
+        result = []
+        e_list = [e for e in self.entities.values() if e.subgoal and e.matched]
+        for e in e_list:
+            if e.matched.get_pred_str() == e.get_pred_str():
+                # case only prop is attached
+                continue
+            axiom = f'The {e.matched.get_pred_str()} is a {e.get_pred_str()}'
+            result.append(axiom)
+        return result
+
+    def from_matched_events(self):
+        result = []
+        e_list = [e for e in self.events.values() if e.subgoal and e.matched]
+        for e in e_list:
+            subject = e.matched.subj.get_pred_str()
+            verb = e.get_pred_str()
+            prop = e.get_prop_str()
+            axiom = f'The {subject} is {verb} {prop}'
+            result.append(axiom)
+        return result
 
 
 class Predicate():
-    def __init__(self, i, name, pos, arg, graph):
+    def __init__(self, i, name, pos, arg, subgoal, graph):
         self.i = i
         self.name = name
         self.pos = pos
         self.graph = graph
-        self.arg = None
-        self.add_arg(arg)
+        self.subgoal = subgoal
+        self.arg = []
+        self.add_arg(arg, subgoal)
 
     def _addEntity(self, ent):
         assert isinstance(
             ent,
             Entity), f'non entity {ent} tried to be added to pred {self.name}'
-        self.arg = ent
+        self.arg.append(ent)
         ent.addPred(self)
         return
 
@@ -79,82 +84,79 @@ class Predicate():
         assert isinstance(
             evt,
             Event), f'non event {evt} tried to be added to pred {self.name}'
-        self.arg = evt
+        self.arg.append(evt)
         evt.addPred(self)
         return
 
-    def add_arg(self, arg):
-        assert isinstance(arg, str) or (isinstance(arg, list)
-                                        and len(arg) == 1)
-        if isinstance(arg, list):
-            arg = arg[0]
+    def add_arg(self, args, subgoal):
+        assert isinstance(args, list)
 
-        t, i = parse(arg)
-        if t == 'e':
-            if i not in self.graph.events:
-                self.graph.addEvent(Event(i))
-            self._addEvent(self.graph.events[i])
-        elif t == 'x':
-            if i not in self.graph.entities:
-                self.graph.addEntity(Entity(i))
-            self._addEntity(self.graph.entities[i])
-        else:
-            raise ValueError()
-        return
-
-
-class Preposition():
-    def __init__(self, i, name, args, graph):
-        self.i = i
-        self.name = name
-        self.graph = graph
-        self.entity = None
-        self.event = None
-        self.pos = 'PP'
-        assert isinstance(args, list) and len(args) == 2
-        self.add_arg(args)
-
-    def _addEntity(self, ent):
-        assert isinstance(
-            ent,
-            Entity), f'non entity {ent} tried to be added to pred {self.name}'
-        self.entity = ent
-        ent.addPred(self)
-        return
-
-    def _addEvent(self, evt):
-        assert isinstance(
-            evt,
-            Event), f'non event {evt} tried to be added to pred {self.name}'
-        self.event = evt
-        evt.addPred(self)
-        return
-
-    def add_arg(self, args):
         for arg in args:
+            assert isinstance(arg, str)
+
+            matched = not arg.startswith('?')
+            if not matched:
+                arg = arg.lstrip('?').replace('z', 'x')
+
             t, i = parse(arg)
+
             if t == 'e':
+
+                if subgoal and matched:
+                    matched_e = self.graph.events[i]
+                    i = i + 1000
+                elif subgoal and not matched:
+                    i = i + 1000
+                else:
+                    pass
+
                 if i not in self.graph.events:
-                    self.graph.addEvent(Event(i))
-                self._addEvent(self.graph.events[i])
+                    self.graph.addEvent(Event(i, subgoal))
+                event = self.graph.events[i]
+                self._addEvent(event)
+
+                if subgoal and matched:
+                    event.add_match(matched_e)
+
             elif t == 'x':
+
+                if subgoal and matched:
+                    matched_e = self.graph.entities[i]
+                    i = i + 1000
+                elif subgoal and not matched:
+                    i = i + 1000
+                else:
+                    pass
+
                 if i not in self.graph.entities:
-                    self.graph.addEntity(Entity(i))
-                self._addEntity(self.graph.entities[i])
+                    self.graph.addEntity(Entity(i, subgoal))
+                entity = self.graph.entities[i]
+                self._addEntity(entity)
+
+                if subgoal and matched:
+                    entity.add_match(matched_e)
+
             else:
-                raise ValueError()
+                raise ValueError(f't={t} which should be x or e')
+
+        # Make first arg Event always for preposition
+        if len(arg) == 2 and isinstance(args[0], Entity):
+            args[0], args[1] = args[1], args[0]
         return
 
 
 class Entity:
-    def __init__(self, i):
+    def __init__(self, i, subgoal=False):
         self.i = int(i)
         self.predicates = []
         self.name = f'x{self.i}'
+        self.subgoal = subgoal
+        self.matched = None
+        self.matched_by = None
         return
 
     def addPred(self, p):
-        assert isinstance(p, Predicate) or isinstance(p, Preposition)
+        assert isinstance(p, Predicate)
         self.predicates.append(p)
         return
 
@@ -165,53 +167,44 @@ class Entity:
             return 100 + pred.i
         elif pred.pos.startswith('CD'):
             return -100 + pred.i
-        elif pred.pos == 'PP':
-            breakpoint()
-            return -200 + pred.i
         elif pred.pos.startswith('RB'):
             return 300 + pred.i
         else:
-            raise ValueError()
+            return -200 + pred.i
 
-    def get_pred_str(self, with_ent=False):
-        if with_ent:
-            acc = []
-            for p in self.predicates:
-                if isinstance(p, Predicate):
-                    acc.append(f'{p.name} {self.name}')
-            return ' & '.join(acc)
-        else:
-            acc = []
-            for p in sorted(self.predicates, key=self.pos_order):
-                if isinstance(p, Predicate):
-                    acc.append(p.name)
-            return ' '.join(acc)
+    def get_pred_str(self):
+        acc = []
+        for p in sorted(self.predicates, key=self.pos_order):
+            if len(p.arg) == 1:
+                acc.append(p.name)
 
-    def get_prop_str(self, with_ent=False):
-        if with_ent:
-            acc = []
-            for p in self.predicates:
-                if isinstance(p, Preposition):
-                    prop_str = f'{p.event.get_pred_str()} & {p.event.get_pred_str(subj=False)} & {p.entity.get_pred_str()} & {p.name} {p.entity} {p.event}'
-                    acc.append(prop_str)
-            return ' & '.join(acc)
-        else:
-            acc = []
-            for p in self.predicates:
-                if isinstance(p, Preposition):
-                    prop_str = f'{p.event.get_pred_str(with_ent=False)} & {p.event.get_pred_str(subj=False,with_ent=False)} & {p.entity.get_pred_str(with_ent=False)} & {p.name} {p.entity} {p.event}'
-                    acc.append(prop_str)
-            return ' '.join(acc)
+        if len(acc) == 0:
+            return self.matched.get_pred_str()
 
-    def __repr__(self):
-        return self.get_pred_str()
+        return ' '.join(acc)
+
+    def get_prop_str(self):
+        acc = []
+        for p in sorted(self.predicates, key=self.pos_order):
+            if len(p.arg) == 2:
+                prop = p.arg[0].get_prop_str()
+                acc.append(prop)
+        return ' '.join(acc)
+
+    def add_match(self, e):
+        self.matched = e
+        e.matched_by = self
+        return
 
 
 class Event:
-    def __init__(self, i):
+    def __init__(self, i, subgoal=False):
         self.i = int(i)
         self.predicates = []
         self.name = f'e{self.i}'
+        self.subgoal = subgoal
+        self.matched = None
+        self.matched_by = None
         return
 
     def pos_order(self, pred):
@@ -223,7 +216,7 @@ class Event:
             return 300 + pred.i
 
     def addPred(self, p):
-        assert isinstance(p, Predicate) or isinstance(p, Preposition)
+        assert isinstance(p, Predicate)
         self.predicates.append(p)
         return
 
@@ -231,46 +224,70 @@ class Event:
         assert isinstance(x, Entity) and not hasattr(self, name)
         setattr(self, name.lower(), x)
 
-    def get_pred_str(self, subj=True, with_ent=False):
-        if with_ent:
-            if subj:
-                return f'Subj({self.name}) = {self.subj.name} & {self.subj.get_pred_str()}'
-            else:
-                acc = []
-                for p in self.predicates:
-                    if isinstance(p, Predicate):
-                        acc.append(f'{p.name} {self.name}')
-                return ' & '.join(acc)
-        else:
-            if subj:
-                return self.subj.get_pred_str(with_ent=False)
-            else:
-                acc = []
-                for p in sorted(self.predicates, key=self.pos_order):
-                    if isinstance(p, Predicate):
-                        acc.append(p.name)
-                return ' '.join(acc)
+    def get_pred_str(self):
+        acc = []
+        for p in sorted(self.predicates, key=self.pos_order):
+            if len(p.arg) == 1:
+                acc.append(p.name)
 
-    def get_prop_str(self, with_ent=False):
-        if with_ent:
-            acc = []
-            for p in self.predicates:
-                if isinstance(p, Preposition):
-                    prop_str = f'{p.event.get_pred_str()} & {p.event.get_pred_str(subj=False)} & {p.entity.get_pred_str()} & {p.name} {p.entity} {p.event}'
-                    acc.append(prop_str)
-            return ' & '.join(acc)
-        else:
-            acc = []
-            for p in self.predicates:
-                if isinstance(p, Preposition):
-                    prop_str = f'{p.event.get_pred_str(with_ent=False)} & {p.event.get_pred_str(subj=False,with_ent=False)} & {p.entity.get_pred_str(with_ent=False)} & {p.name} {p.entity} {p.event}'
-                    acc.append(prop_str)
-            return ' '.join(acc)
+        if len(acc) == 0:
+            return self.matched.get_pred_str()
 
-    def __repr__(self):
-        return self.get_pred_str(subj=False)
+        else:
+            acc[0] = progressive(acc[0])
+            verb = " ".join(acc)
+            if hasattr(self, 'acc'):
+                acc = self.acc.get_pred_str()
+                verb += f' a {acc}'
+            if hasattr(self, 'dat'):
+                dat = self.dat.get_pred_str()
+                verb += f' to {dat}'
+        return verb
+
+    def get_prop_str(self):
+        acc = []
+        for p in self.predicates:
+            if len(p.arg) == 2:
+                x = p.arg[1].get_pred_str()
+                acc.append(f'{p.name} a {x}')
+        return ' '.join(acc)
+
+    def add_match(self, e):
+        self.matched = e
+        e.matched_by = self
+        return
 
 
 def parse(x):
     assert isinstance(x, str)
     return x[0], int(x[1:])
+
+
+def format_pred(p):
+
+    if '_' in p.name:
+        name = p.name.replace('_', ' ')
+    else:
+        name = p.name
+
+    if p.pos.startswith('V'):
+        return progressive(name)
+    elif p.pos.startswith('JJ'):
+        return name
+    elif p.pos.startswith('NN'):
+        return f'a {name}'
+    elif p.pos.startswith('RB'):
+        return name
+    else:
+        return name
+
+
+def progressive(name):
+    # TODO change this to spacy or nltk or something
+    if name.endswith('ing'):
+        return name
+    if name.endswith('t'):
+        name = name + 't'
+    elif name.endswith('e'):
+        name = name.rstrip('e')
+    return name + 'ing'
