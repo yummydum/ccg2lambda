@@ -11,3 +11,4 @@ en/SICK.semeval.txt
 data/*
 *__pycache__*
 .vscode
+graph.gv*
