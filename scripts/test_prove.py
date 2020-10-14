@@ -18,6 +18,7 @@ def test_prove_3(monkeypatch):
         '--abduction', 'spsa'
     ])
     axioms = main()
+    breakpoint()
     assert axioms[0] == 'The young boy is a kid'
     assert axioms[1] == 'The man is smiling nearby with a smile_2'
     assert axioms[2] == 'The young boy is playing outdoors near a man'
@@ -30,6 +31,7 @@ def test_prove_5(monkeypatch):
         '--abduction', 'spsa'
     ])
     axioms = main()
+    breakpoint()
     assert axioms[0] == 'The young boy is a kid'
     assert axioms[1] == 'The man is smiling nearby with a smile_2'
     assert axioms[2] == 'The young boy is playing outdoors near a man'
