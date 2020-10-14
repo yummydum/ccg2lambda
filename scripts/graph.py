@@ -1,3 +1,6 @@
+from graphviz import Digraph
+
+
 class Graph:
     def __init__(self):
         self.entities = dict()
@@ -58,7 +61,7 @@ class Graph:
             if e.matched.get_pred_str() == e.get_pred_str():
                 # case only prop is attached
                 continue
-            axiom = f'The {e.matched.get_pred_str()} is a {e.get_pred_str()}'
+            axiom = f'The {e.matched.get_pred_str()} is {e.get_pred_str(add_det=True)}'
             result.append(axiom)
         return result
 
@@ -67,11 +70,56 @@ class Graph:
         e_list = [e for e in self.events.values() if e.subgoal and e.matched]
         for e in e_list:
             subject = e.matched.subj.get_pred_str()
-            verb = e.get_pred_str()
+            verb = e.get_pred_str(prog=True)
             prop = e.get_prop_str()
             axiom = f'The {subject} is {verb} {prop}'
             result.append(axiom)
         return result
+
+    def visualize(self, with_subgoal=True):
+        g = Digraph('G', filename='graph.gv', engine='sfdp')
+
+        for e in self.entities.values():
+            if e.subgoal:
+                if not with_subgoal:
+                    continue
+                else:
+                    g.node(e.name, color='lightpink', style='filled')
+                    if e.matched is not None:
+                        g.edge(e.name, e.matched.name, label='unified')
+            else:
+                g.node(e.name,
+                       shape='box',
+                       color='aquamarine2',
+                       style='filled')
+
+        for e in self.events.values():
+
+            if e.subgoal:
+                if not with_subgoal:
+                    continue
+                else:
+                    g.node(e.name, color='lightpink', style='filled')
+                    if e.matched is not None:
+                        g.edge(e.name, e.matched.name, label='unified')
+
+            else:
+                g.node(e.name,
+                       shape='box',
+                       color='aquamarine2',
+                       style='filled')
+
+            for sr in ['subj', 'acc', 'dat']:
+                if hasattr(e, sr):
+                    ent = getattr(e, sr)
+                    g.edge(e.name, ent.name, label=sr)
+
+        for p in self.predicate.values():
+            g.node(p.name)
+            for e in p.arg:
+                g.edge(p.name, e.name)
+        g.view()
+        return
 
 
 class Predicate():
@@ -187,16 +235,22 @@ class Entity:
         else:
             return -200 + pred.i
 
-    def get_pred_str(self):
+    def get_pred_str(self, add_det=False):
         acc = []
         for p in sorted(self.predicates, key=self.pos_order):
             if len(p.arg) == 1:
-                acc.append(p.name)
+                acc.append(p)
 
+        # Only prop case
         if len(acc) == 0:
             return self.matched.get_pred_str()
 
-        return ' '.join(acc)
+        result = ' '.join([p.name for p in acc])
+
+        if add_det and acc[-1].pos.startswith('NN'):
+            result = f'a {result}'
+
+        return result
 
     def get_prop_str(self):
         acc = []
@@ -239,18 +293,21 @@ class Event:
         assert isinstance(x, Entity) and not hasattr(self, name)
         setattr(self, name.lower(), x)
 
-    def get_pred_str(self):
+    def get_pred_str(self, prog=False):
         acc = []
         for p in sorted(self.predicates, key=self.pos_order):
             if len(p.arg) == 1:
-                acc.append(p.name)
+                acc.append(p)
 
         if len(acc) == 0:
-            return self.matched.get_pred_str()
+            return self.matched.get_pred_str(prog=prog)
 
         else:
-            acc[0] = progressive(acc[0])
-            verb = " ".join(acc)
+
+            if prog and acc[0].pos.startswith('VB'):
+                acc[0] = progressive(acc[0])
+
+            verb = " ".join([p.name for p in acc])
             if hasattr(self, 'acc'):
                 acc = self.acc.get_pred_str()
                 verb += f' a {acc}'
@@ -284,31 +341,13 @@ def parse(x):
     return t, i
 
 
-def format_pred(p):
-
-    if '_' in p.name:
-        name = p.name.replace('_', ' ')
-    else:
-        name = p.name
-
-    if p.pos.startswith('V'):
-        return progressive(name)
-    elif p.pos.startswith('JJ'):
-        return name
-    elif p.pos.startswith('NN'):
-        return f'a {name}'
-    elif p.pos.startswith('RB'):
-        return name
-    else:
-        return name
-
-
-def progressive(name):
+def progressive(p):
     # TODO change this to spacy or nltk or something
-    if name.endswith('ing'):
-        return name
-    if name.endswith('t'):
-        name = name + 't'
-    elif name.endswith('e'):
-        name = name.rstrip('e')
-    return name + 'ing'
+    if p.name.endswith('ing'):
+        return
+    if p.name.endswith('t'):
+        p.name = p.name + 't'
+    elif p.name.endswith('e'):
+        p.name = p.name.rstrip('e')
+    p.name = p.name + 'ing'
+    return p

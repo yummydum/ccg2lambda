@@ -388,12 +388,15 @@ def get_matched_premises(theorem):
     premise_lines = get_premise_lines(output_lines)
     conclusion = get_conclusion_line(output_lines)
     subgoals = get_subgoals_from_coq_output2(output_lines)
+    theorem.subgoals = subgoals
     premises, subgoals = preprocess(theorem, premise_lines, conclusion,
                                     subgoals)
     graph = make_graph(theorem, premises, subgoals)
+    graph.visualize()
     if not premise_lines:
         raise ValueError('Type error')
     elif not subgoals:  # proved?
+        # assert proved here
         return {}
     return graph.create_axioms()
 

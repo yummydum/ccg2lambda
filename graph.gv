@@ -1,0 +1,45 @@
+digraph G {
+	x2 [color=aquamarine2 shape=box style=filled]
+	x100 [color=aquamarine2 shape=box style=filled]
+	x101 [color=aquamarine2 shape=box style=filled]
+	x1100 [color=lightpink style=filled]
+	x1100 -> x100 [label=unified]
+	x10999 [color=lightpink style=filled]
+	e0 [color=aquamarine2 shape=box style=filled]
+	e0 -> x101 [label=subj]
+	e3 [color=aquamarine2 shape=box style=filled]
+	e3 -> x100 [label=subj]
+	e1003 [color=lightpink style=filled]
+	e1003 -> e3 [label=unified]
+	e1003 -> x1100 [label=subj]
+	e1000 [color=lightpink style=filled]
+	e1000 -> e0 [label=unified]
+	e1000 -> x101 [label=subj]
+	smile
+	smile -> x2
+	play
+	play -> e0
+	outdoors
+	outdoors -> e0
+	man
+	man -> x100
+	kid
+	kid -> x101
+	with
+	with -> e3
+	with -> x2
+	old
+	old -> x1100
+	stand
+	stand -> e1003
+	background
+	background -> e1000
+	yard
+	yard -> x10999
+	in
+	in -> e1000
+	in -> x10999
+	in_2
+	in_2 -> e1003
+	in_2 -> e1000
+}

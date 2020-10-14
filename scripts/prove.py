@@ -91,6 +91,10 @@ def prove(args):
                 fout.write(premise + '\n\n')
                 fout.write('Conclusion:\n')
                 fout.write(hypothesis + '\n\n')
+                fout.write('Subgoals:\n')
+                for goal in theorem.theorems[0].subgoals:
+                    fout.write(goal + '\n')
+                fout.write('\n')
                 fout.write('Axioms:\n')
                 for text in created_axioms:
                     fout.write(text + '\n')

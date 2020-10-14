@@ -24,6 +24,18 @@ def test_prove_3(monkeypatch):
     return
 
 
+def test_prove_5(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_5.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms = main()
+    assert axioms[0] == 'The young boy is a kid'
+    assert axioms[1] == 'The man is smiling nearby with a smile_2'
+    assert axioms[2] == 'The young boy is playing outdoors near a man'
+    return
+
+
 def test_prove_26(monkeypatch):
     monkeypatch.setattr('sys.argv', [
         'scripts/prove.py', 'data/parsed/pair_26.sem.xml', '--write',
