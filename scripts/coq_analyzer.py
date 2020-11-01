@@ -19,7 +19,7 @@ from __future__ import print_function
 from collections import OrderedDict
 import logging
 import re
-
+from pyparsing import nestedExpr
 from nltk import Tree
 
 from normalization import denormalize_token
@@ -49,16 +49,32 @@ def find_final_conclusion_sep_line_index(coq_output_lines):
 
 
 def get_premise_lines(coq_output_lines):
+
     premise_lines = []
     line_index_last_conclusion_sep = find_final_conclusion_sep_line_index(
         coq_output_lines)
+
     if not line_index_last_conclusion_sep:
         return premise_lines
+
+    in_bracket = False
+    acc = []
     for line in coq_output_lines[line_index_last_conclusion_sep - 1:0:-1]:
         if line == "":
             return premise_lines
         else:
-            premise_lines.append(line)
+            if 'forall' in line:
+                acc = [line] + acc
+                in_bracket = False
+                premise_lines.append(" ".join(acc))
+            elif in_bracket:
+                acc = [line] + acc
+            elif 'False' in line:
+                acc = [line]
+                in_bracket = True
+            else:
+                premise_lines.append(line)
+
     return premise_lines
 
 
@@ -374,13 +390,18 @@ def make_graph(theorem, premises, subgoals):
     for premise in premises:
         if '=' in premise:
             name, event, _, entity = premise.split()
-            graph.addRelation(event, entity, name)
+            graph.addRelation(event, entity, name, subgoal=False)
 
     for goal in subgoals:
         if '=' in goal:
             name, event, _, entity = goal.split()
-            graph.addRelation(event, entity, name)
+            graph.addRelation(event, entity, name, subgoal=True)
     return graph
+
+
+# def make_negation_graph(negation):
+#     breakpoint()
+#     return
 
 
 def get_matched_premises(theorem):
@@ -389,10 +410,11 @@ def get_matched_premises(theorem):
     conclusion = get_conclusion_line(output_lines)
     subgoals = get_subgoals_from_coq_output2(output_lines)
     theorem.subgoals = subgoals
-    premises, subgoals = preprocess(theorem, premise_lines, conclusion,
-                                    subgoals)
+    premises, subgoals, negation = preprocess(theorem, premise_lines,
+                                              conclusion, subgoals)
     graph = make_graph(theorem, premises, subgoals)
-    graph.visualize()
+    # negation_graph = make_negation_graph(negation)
+    # graph.visualize()
     if not premise_lines:
         raise ValueError('Type error')
     elif not subgoals:  # proved?
@@ -487,11 +509,104 @@ def preprocess_variables(premises, subgoals):
     return premises, subgoals
 
 
+def handle_negation(premises):
+
+    negation = []
+
+    for i, line in enumerate(premises):
+        if 'forall' in line:
+            line = line.replace('/\\ True', '')
+            line = line.replace('/\\', '')
+            line = line.rstrip(' -> False')
+            line = line.replace(' : ', ':')
+            line = line.replace('exists', '')
+            line = line[line.find('forall') + 6:]
+            parsed = nestedExpr('(', ')').parseString(f'({line})').asList()[0]
+            forall_x = parsed[0].split(':')[0]
+
+            var2name = {}
+            pred2var = {}
+            index = 10**8
+            sr_list = []
+
+            def traverse(phrase, count, temp, current_pred):
+
+                nonlocal var2name
+                nonlocal index
+                nonlocal sr_list
+
+                if isinstance(phrase, list):
+                    for p in phrase:
+                        count, temp, current_pred = traverse(
+                            p, count, temp, current_pred)
+
+                elif isinstance(phrase, str):
+                    if ':' in phrase:
+                        var, typ = phrase.split(':')
+                        if len(var) == 1:
+                            if var in {'x', 'z'}:
+                                var2name[var] = f'x{index}'
+                            elif var == 'e':
+                                var2name[var] = f'e{index}'
+                            else:
+                                raise ValueError()
+                        elif typ.startswith('Entity'):
+                            var2name[var] = f'e{index}'
+                        elif typ.startswith('Event'):
+                            var2name[var] = f'e{index}'
+                        else:
+                            raise ValueError()
+                        index += 1
+
+                    elif count > 0:
+                        temp.append(phrase)
+                        count -= 1
+                        if count == 0:
+                            if phrase in {'Subj', 'Acc', 'Dat'}:
+                                return 1, temp, None
+                            else:
+                                sr_list.append(' '.join(temp))
+                                return 0, [], None
+                    elif phrase in {'Subj', 'Acc', 'Dat'}:
+                        count = 3
+                        temp = [phrase]
+
+                    elif phrase.startswith('_'):
+                        pred2var[phrase] = []
+                        current_pred = phrase
+                    elif phrase in var2name:
+                        pred2var[current_pred].append(var2name[phrase])
+                    else:
+                        raise ValueError('How can you come here')
+
+                return count, temp, current_pred
+
+            traverse(parsed, 0, [], None)
+
+            exists = ','.join(
+                [x for x in var2name.values() if x != var2name[forall_x]])
+            newline = [f'forall {var2name[forall_x]} exists {exists}(']
+            for k, v in pred2var.items():
+                newline.append(k)
+                for arg in v:
+                    newline.append(arg)
+                newline.append('&')
+            newline = ' '.join(newline)
+            newline = newline.rstrip('&')
+            newline += ')'
+
+            negation.append(newline)
+            del premises[i]
+
+    return negation, premises
+
+
 def preprocess(theorem, premises, conclusion, subgoals):
 
     if 'False' not in conclusion:
         subgoals.append(conclusion)
 
+    negation, premises = handle_negation(premises)
     premises, subgoals = preprocess_variables(premises, subgoals)
     premises, subgoals = preprocess_sr(premises, subgoals)
 
@@ -504,5 +619,4 @@ def preprocess(theorem, premises, conclusion, subgoals):
     premises = sorted(premises, key=lambda x: len(x.split(' ')))
     subgoals = sorted(subgoals, key=lambda x: len(x.split(' ')))
 
-    # merge conclucion and subgoals
-    return premises, subgoals
+    return premises, subgoals, negation

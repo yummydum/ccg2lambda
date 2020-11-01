@@ -14,23 +14,27 @@ class Graph:
         self.predicate[pred.name] = pred
         return
 
-    def addRelation(self, event, entity, name):
+    def addRelation(self, event, entity, name, subgoal):
 
-        unmatched = entity.startswith('?')
-        if unmatched:
+        matched = not entity.startswith('?')
+        if not matched:
             entity = entity.lstrip('?')
 
         t_e, i_e = parse(event)
         t_x, i_x = parse(entity)
 
-        if unmatched:
-            i_x += 1000
+        if subgoal:
+            if matched:
+                i_x += 1000
+            else:
+                i_x += 500
 
         event = self.events[i_e]
         entity = self.entities[i_x]
         self.events[event.i].addRelation(entity, name)
 
-        if event.matched_by is not None:
+        # If the event is matched, add relation of subgoal entity as well (they share relation)
+        if subgoal and matched:
             if entity.i + 1000 in self.entities:
                 entity = self.entities[entity.i + 1000]
             else:
@@ -58,22 +62,46 @@ class Graph:
         result = []
         e_list = [e for e in self.entities.values() if e.subgoal and e.matched]
         for e in e_list:
-            if e.matched.get_pred_str() == e.get_pred_str():
-                # case only prop is attached
-                continue
-            axiom = f'The {e.matched.get_pred_str()} is {e.get_pred_str(add_det=True)}'
-            result.append(axiom)
+            for pred in e.predicates:
+                subgoal = pred.name
+                if pred.pos.startswith('NN'):
+                    subgoal = f'a {subgoal}'
+                elif pred.pos.startswith('JJ'):
+                    pass
+                else:
+                    continue
+                axiom = f'The {e.matched.core_pred.name} is {subgoal}'
+                result.append(axiom)
         return result
 
     def from_matched_events(self):
         result = []
         e_list = [e for e in self.events.values() if e.subgoal and e.matched]
         for e in e_list:
-            subject = e.matched.subj.get_pred_str()
-            verb = e.get_pred_str(prog=True)
-            prop = e.get_prop_str()
-            axiom = f'The {subject} is {verb} {prop}'
-            result.append(axiom)
+            subject = e.matched.subj.core_pred.name
+            # verb advb subgoal
+            for pred in e.predicates:
+                if pred.pos.startswith('V'):
+                    verb = progressive(pred).name
+                    axiom = f'The {subject} is {e.add_sr(verb)}'
+                    result.append(axiom)
+                elif pred.pos.startswith('RB'):
+                    axiom = f'The {subject} is doing something {pred.name}'
+                    result.append(axiom)
+
+            for prop in e.get_props():
+                for arg in prop.arg:
+                    if arg != e:
+                        break
+
+                # Use the matched entity for prop arg
+                if arg.matched is not None:
+                    axiom = f'The {subject} is {prop.name} a {arg.matched.core_pred.name}'
+
+                # Use core pred itself if unmatched (these are unmatched subgoal via propositon)
+                else:
+                    axiom = f'The {subject} is {prop.name} {arg.get_all_pred_str()}'
+                result.append(axiom)
         return result
 
     def visualize(self, with_subgoal=True):
@@ -163,15 +191,14 @@ class Predicate():
 
             if t == 'e':
 
-                if subgoal and matched:
-                    matched_e = self.graph.events[i]
-                    i += 1000
-
-                # ?e
-                elif subgoal and not matched:
-                    i += 500
-                else:
-                    pass
+                if subgoal:
+                    # If it has corresponding entity then make a new e with + 1000
+                    if matched:
+                        matched_e = self.graph.events[i]
+                        i += 1000
+                    # If not matched make a unmatched with +500
+                    else:
+                        i += 500
 
                 if i not in self.graph.events:
                     self.graph.addEvent(Event(i, subgoal))
@@ -183,16 +210,14 @@ class Predicate():
 
             elif t == 'x':
 
-                if subgoal and matched:
-                    if i == 200:
-                        breakpoint()
-                    matched_e = self.graph.entities[i]
-                    i += 1000
-                # ?x
-                elif subgoal and not matched:
-                    i += 500
-                else:
-                    pass
+                if subgoal:
+                    # If it has corresponding entity then make a new e with + 1000
+                    if matched:
+                        matched_e = self.graph.entities[i]
+                        i += 1000
+                    # If not matched make a unmatched with +500
+                    else:
+                        i += 500
 
                 if i not in self.graph.entities:
                     self.graph.addEntity(Entity(i, subgoal))
@@ -217,13 +242,20 @@ class Entity:
         self.predicates = []
         self.name = f'x{self.i}'
         self.subgoal = subgoal
-        self.matched = None
-        self.matched_by = None
+        self.matched = None  # for subgoal entity, this is the matched entity
+        self.matched_by = None  # for matched entity, this is the subgoal entity
+        self.core_pred = None
+        self.core_prop = None
         return
 
     def addPred(self, p):
         assert isinstance(p, Predicate)
         self.predicates.append(p)
+
+        if p.pos.startswith('NN'):
+            self.core_pred = p
+        if len(p.arg) == 2:
+            self.core_prop = p
         return
 
     def pos_order(self, pred):
@@ -238,30 +270,15 @@ class Entity:
         else:
             return -200 + pred.i
 
-    def get_pred_str(self, add_det=False):
+    def get_all_pred_str(self):
         acc = []
         for p in sorted(self.predicates, key=self.pos_order):
             if len(p.arg) == 1:
                 acc.append(p)
-
-        # Only prop case
-        if len(acc) == 0:
-            return self.matched.get_pred_str()
-
         result = ' '.join([p.name for p in acc])
-
-        if add_det and acc[-1].pos.startswith('NN'):
+        if acc[-1].pos.startswith('NN'):
             result = f'a {result}'
-
         return result
-
-    def get_prop_str(self):
-        acc = []
-        for p in sorted(self.predicates, key=self.pos_order):
-            if len(p.arg) == 2:
-                prop = p.arg[0].get_prop_str()
-                acc.append(prop)
-        return ' '.join(acc)
 
     def add_match(self, e):
         self.matched = e
@@ -277,6 +294,7 @@ class Event:
         self.subgoal = subgoal
         self.matched = None
         self.matched_by = None
+        self.core_pred = None
         return
 
     def pos_order(self, pred):
@@ -287,45 +305,51 @@ class Event:
         else:
             return 300 + pred.i
 
+    def get_props(self):
+        return [x for x in self.predicates if len(x.arg) == 2]
+
     def addPred(self, p):
         assert isinstance(p, Predicate)
         self.predicates.append(p)
+        if p.pos.startswith('V'):
+            self.core_pred = p
         return
 
     def addRelation(self, x: Entity, name: str):
         assert isinstance(x, Entity) and not hasattr(self, name)
         setattr(self, name.lower(), x)
 
-    def get_pred_str(self, prog=False):
+    def add_sr(self, verb):
+        if hasattr(self, 'acc'):
+            acc = self.acc.core_pred.name
+            verb += f' a {acc}'
+        elif hasattr(self.matched, 'acc'):
+            if self.matched.acc.matched_by is not None:
+                acc = self.matched.acc.matched_by.core_pred.name
+            else:
+                acc = self.matched.acc.core_pred.name
+            verb += f' a {acc}'
+
+        if hasattr(self, 'dat'):
+            dat = self.dat.core_pred
+            verb += f' to a {dat}'
+        elif hasattr(self.matched, 'dat'):
+            if self.matched.dat.matched_by is not None:
+                dat = self.matched.dat.matched_by.core_pred.name
+            else:
+                dat = self.matched.dat.core_pred.name
+            verb += f' to a {dat}'
+        return verb
+
+    def get_all_pred_str(self):
         acc = []
         for p in sorted(self.predicates, key=self.pos_order):
             if len(p.arg) == 1:
                 acc.append(p)
-
-        if len(acc) == 0:
-            return self.matched.get_pred_str(prog=prog)
-
-        else:
-
-            if prog and acc[0].pos.startswith('VB'):
-                acc[0] = progressive(acc[0])
-
-            verb = " ".join([p.name for p in acc])
-            if hasattr(self, 'acc'):
-                acc = self.acc.get_pred_str()
-                verb += f' a {acc}'
-            if hasattr(self, 'dat'):
-                dat = self.dat.get_pred_str()
-                verb += f' to a {dat}'
-        return verb
-
-    def get_prop_str(self):
-        acc = []
-        for p in self.predicates:
-            if len(p.arg) == 2:
-                x = p.arg[1].get_pred_str()
-                acc.append(f'{p.name} a {x}')
-        return ' '.join(acc)
+        result = ' '.join([p.name for p in acc])
+        if acc[-1].pos.startswith('NN'):
+            result = f'a {result}'
+        return result
 
     def add_match(self, e):
         self.matched = e
