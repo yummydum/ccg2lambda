@@ -6,6 +6,9 @@ class Graph:
         self.entities = dict()
         self.events = dict()
         self.predicate = dict()
+        self.relation_subgoal = []
+        self.subgoals = dict(
+        )  # mark which subgoals are processed by the generated sentence
 
     def addPred(self, i, name, pos, arg, subgoal):
         if name in self.predicate:
@@ -14,32 +17,61 @@ class Graph:
         self.predicate[pred.name] = pred
         return
 
-    def addRelation(self, event, entity, name, subgoal):
-
-        matched = not entity.startswith('?')
-        if not matched:
-            entity = entity.lstrip('?')
+    def addRelation(self, event, entity, name):
 
         t_e, i_e = parse(event)
         t_x, i_x = parse(entity)
-
-        if subgoal:
-            if matched:
-                i_x += 1000
-            else:
-                i_x += 500
 
         event = self.events[i_e]
         entity = self.entities[i_x]
         self.events[event.i].addRelation(entity, name)
 
-        # If the event is matched, add relation of subgoal entity as well (they share relation)
-        if subgoal and matched:
-            if entity.i + 1000 in self.entities:
-                entity = self.entities[entity.i + 1000]
-            else:
-                entity = self.entities[entity.i]
+        # Assuming event and matched event share same predicate argument, copy the argument relation to the subgoal specific event
+        if event.matched_by is not None:
             self.events[event.matched_by.i].addRelation(entity, name)
+        return
+
+    def addSubgoalRelation(self, event, entity, name):
+        if event.startswith('?'):
+            event = event.lstrip('?')
+            e_matched = False
+        else:
+            e_matched = True
+
+        if entity.startswith('?'):
+            entity = entity.lstrip('?')
+            x_matched = False
+        else:
+            x_matched = True
+
+        t_e, i_e = parse(event)
+        t_x, i_x = parse(entity)
+
+        assert t_e == 'e'
+        assert t_x == 'x'
+
+        if x_matched:
+            i_x += 1000
+        else:
+            i_x += 500
+        if e_matched:
+            i_e += 1000
+        else:
+            i_e += 500
+
+        if i_x not in self.entities:
+            matched_x = self.entities[i_x - 1000]
+            self.addEntity(Entity(i_x, subgoal=True))
+            self.entities[i_x].add_match(matched_x)
+
+        if i_e not in self.events:
+            matched_e = self.events[i_e - 1000]
+            self.addEvent(Event(i_e, subgoal=True))
+            self.entities[i_e].add_match(matched_e)
+
+        event = self.events[i_e]
+        entity = self.entities[i_x]
+        self.events[event.i].addRelation(entity, name)
         return
 
     def addEntity(self, e):
@@ -56,6 +88,9 @@ class Graph:
         result = []
         result += self.from_matched_entities()
         result += self.from_matched_events()
+        # result += self.from_unmatched_entities()  # assume this is handled by matched event (unmatched entity comes from new prop and new pred arg)
+        result += self.from_unmatched_events()
+        result += self.from_pr_subgoal()
         return result
 
     def from_matched_entities(self):
@@ -74,6 +109,15 @@ class Graph:
                 result.append(axiom)
         return result
 
+    def from_unmatched_entities(self):
+        result = []
+        e_list = [
+            e for e in self.entities.values() if e.subgoal and not e.matched
+        ]
+        if len(e_list) > 0:
+            breakpoint()
+        return result
+
     def from_matched_events(self):
         result = []
         e_list = [e for e in self.events.values() if e.subgoal and e.matched]
@@ -83,7 +127,7 @@ class Graph:
             for pred in e.predicates:
                 if pred.pos.startswith('V'):
                     verb = progressive(pred).name
-                    axiom = f'The {subject} is {e.add_sr(verb)}'
+                    axiom = f'The {subject} is {e.get_pr(verb)}'
                     result.append(axiom)
                 elif pred.pos.startswith('RB'):
                     axiom = f'The {subject} is doing something {pred.name}'
@@ -103,6 +147,80 @@ class Graph:
                     axiom = f'The {subject} is {prop.name} {arg.get_all_pred_str()}'
                 result.append(axiom)
         return result
+
+    def from_unmatched_events(self):
+
+        result = []
+        e_list = [
+            e for e in self.events.values() if e.subgoal and not e.matched
+        ]
+        for e in e_list:
+
+            # e? introduced by prop
+            if not hasattr(e, 'subj'):
+                continue
+            # subj is unmatched (completely different sentence?)
+            elif e.subj.matched is None:
+                continue
+
+            subject = e.subj.matched.core_pred.name
+            # verb advb subgoal
+            for pred in e.predicates:
+                if pred.pos.startswith('V'):
+                    verb = progressive(pred).name
+                    axiom = f'The {subject} is {e.get_pr(verb)}'
+                    result.append(axiom)
+                elif pred.pos.startswith('RB'):
+                    axiom = f'The {subject} is doing something {pred.name}'
+                    result.append(axiom)
+
+            for prop in e.get_props():
+                for arg in prop.arg:
+                    if arg != e:
+                        break
+
+                # Use the matched entity for prop arg
+                if arg.matched is not None:
+                    axiom = f'The {subject} is {prop.name} a {arg.matched.core_pred.name}'
+
+                # Use core pred itself if unmatched (these are unmatched subgoal via propositon)
+                else:
+                    axiom = f'The {subject} is {prop.name} {arg.get_all_pred_str()}'
+                result.append(axiom)
+        return result
+
+    def from_pr_subgoal(self):
+        result = []
+        for goal in self.relation_subgoal:
+            first, second = goal
+            rel, name = first[0], first[1]
+            node1 = self.parseRel(name)
+            rel2, name2 = second[0], second[1]
+            node2 = self.parseRel(name2)
+
+            rel = rel.lower()
+            rel2 = rel2.lower()
+
+            subj = node1.subj.matched.core_pred.name
+            verb = node1.core_pred
+            target = getattr(node2, rel2).core_pred.name
+            axiom = f'The {subj} is {progressive(verb).name} a {target}'
+
+            result.append(axiom)
+        return result
+
+    def parseRel(self, name):
+        unmatched = name.startswith('?')
+        if unmatched:
+            name = name.lstrip('?')
+        t, i = parse(name)
+
+        if unmatched:
+            i += 500
+        if t == 'x':
+            return self.entities[i]
+        else:
+            return self.events[i]
 
     def visualize(self, with_subgoal=True):
         g = Digraph('G', filename='graph.gv', engine='sfdp')
@@ -319,11 +437,32 @@ class Event:
         assert isinstance(x, Entity) and not hasattr(self, name)
         setattr(self, name.lower(), x)
 
-    def add_sr(self, verb):
+    def get_pr(self, verb):
+        """
+        Get predicate arguments from subgoal event
+        """
+
+        assert self.subgoal
+
+        # check if this event has predicate argument (this should be conclusion specific predicate argument)
         if hasattr(self, 'acc'):
-            acc = self.acc.core_pred.name
+            if self.acc.subgoal:
+                if self.acc.matched is not None:
+                    acc = self.acc.matched.core_pred.name
+                # unmatched acc which only exists in conclusion
+                else:
+                    acc = self.acc.core_pred.name
+            else:
+                if self.acc.matched_by is not None:
+                    acc = self.acc.matched_by.core_pred.name
+                else:
+                    acc = self.acc.core_pred.name
             verb += f' a {acc}'
+
+        # if not check matched event in premise
+        # self doesn't have acc but matched has? when does this occur
         elif hasattr(self.matched, 'acc'):
+            breakpoint()
             if self.matched.acc.matched_by is not None:
                 acc = self.matched.acc.matched_by.core_pred.name
             else:
@@ -331,14 +470,31 @@ class Event:
             verb += f' a {acc}'
 
         if hasattr(self, 'dat'):
-            dat = self.dat.core_pred
+            if self.dat.subgoal:
+
+                if self.dat.matched is not None:
+                    dat = self.dat.matched.core_pred.name
+
+                # unmatched dat which only exists in conclusion
+                else:
+                    dat = self.dat.core_pred.name
+            else:
+                if self.dat.matched_by is not None:
+                    dat = self.dat.matched_by.core_pred.name
+                else:
+                    dat = self.dat.core_pred.name
             verb += f' to a {dat}'
+
+        # if not check matched event in premise
+        # self doesn't have dat but matched has? when does this occur
         elif hasattr(self.matched, 'dat'):
+            breakpoint()
             if self.matched.dat.matched_by is not None:
                 dat = self.matched.dat.matched_by.core_pred.name
             else:
                 dat = self.matched.dat.core_pred.name
             verb += f' to a {dat}'
+
         return verb
 
     def get_all_pred_str(self):
@@ -371,7 +527,7 @@ def parse(x):
 def progressive(p):
     # TODO change this to spacy or nltk or something
     if p.name.endswith('ing'):
-        return
+        return p
     if p.name.endswith('t'):
         p.name = p.name + 't'
     elif p.name.endswith('e'):

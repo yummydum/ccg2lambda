@@ -28,7 +28,8 @@ from nltk2coq import normalize_interpretation
 from semantic_types import get_dynamic_library_from_doc
 from tactics import get_tactics
 from normalization import substitute_invalid_chars
-from nltk2normal import rename_variable, convert_to_prenex, remove_true
+from nltk2normal import rename_variable, convert_to_prenex, remove_true, get_negated_subtree
+from nltk.sem.logic import Expression
 
 
 def normalize(x):
@@ -212,9 +213,12 @@ class Theorem(object):
 
     def prove_simple(self):
         # from pudb import set_trace; set_trace()
-        self.coq_script = make_coq_script(self.premises, self.conclusion,
-                                          self.dynamic_library_str,
-                                          self.axioms)
+        self.coq_script, self.neg_preds = make_coq_script(
+            self.premises,
+            self.conclusion,
+            self.dynamic_library_str,
+            self.axioms,
+            neg_sub=True)
         self.inference_result = prove_script(self.coq_script, self.timeout)
         return
 
@@ -388,6 +392,16 @@ def get_formulas_from_doc(doc):
 
 
 def make_coq_formulae(premise_interpretations, conclusion, reverse=False):
+    neg_tree = get_negated_subtree(conclusion)
+    if neg_tree:
+        neg_str = str(neg_tree[0])
+        pos_str = str(neg_tree[0].negate())
+        conclusion = str(conclusion).replace(neg_str, pos_str)
+        conclusion = Expression.fromstring(conclusion)
+        negated_preds = [str(x) for x in neg_tree[0].predicates()]
+    else:
+        negated_preds = []
+
     interpretations = premise_interpretations + [conclusion]
     interpretations = [
         normalize_interpretation(interp) for interp in interpretations
@@ -395,16 +409,19 @@ def make_coq_formulae(premise_interpretations, conclusion, reverse=False):
     if reverse:
         interpretations.reverse()
     coq_formulae = ' -> '.join(interpretations)
-    return coq_formulae
+    return coq_formulae, negated_preds
 
 
 def make_coq_script(premise_interpretations,
                     conclusion,
                     dynamic_library='',
-                    axioms=None):
+                    axioms=None,
+                    neg_sub=False):
     # Transform these interpretations into coq format:
     #   interpretation1 -> interpretation2 -> ... -> conclusion
-    coq_formulae = make_coq_formulae(premise_interpretations, conclusion)
+    coq_formulae, neg_preds = make_coq_formulae(premise_interpretations,
+                                                conclusion)
+
     # Input these formulae to coq and retrieve the results.
     tactics = get_tactics()
     coq_script = "Require Export coqlib.\n{0}\nTheorem t1: {1}. {2}.".format(
@@ -412,7 +429,10 @@ def make_coq_script(premise_interpretations,
     if axioms is not None and len(axioms) > 0:
         coq_script = insert_axioms_in_coq_script(axioms, coq_script)
     coq_script = substitute_invalid_chars(coq_script, 'replacement.txt')
-    return coq_script
+    if neg_sub:
+        return coq_script, neg_preds
+    else:
+        return coq_script
 
 
 def prove_script(coq_script, timeout=100):

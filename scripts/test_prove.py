@@ -12,6 +12,21 @@ def test_prove_1(monkeypatch):
     return
 
 
+def test_prove_2(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_2.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms = main()
+    assert axioms[0] == 'The house is a yard'
+    assert axioms[1] == 'The house is a background'
+    assert axioms[2] == 'The child is a man'
+    assert axioms[3] == 'The child is old'
+    assert axioms[4] == 'The child is a kid'
+    assert axioms[5] == 'The child is standing'
+    return
+
+
 def test_prove_3(monkeypatch):
     monkeypatch.setattr('sys.argv', [
         'scripts/prove.py', 'data/parsed/pair_3.sem.xml', '--write',
@@ -57,11 +72,24 @@ def test_prove_40(monkeypatch):
         '--abduction', 'spsa'
     ])
     axioms = main()
-    assert axioms[0] == 'The basketball is a ball'
+    assert axioms[0] == 'The basketball is a ball'  # composite word
     assert axioms[1] == 'The basketball is a game'
     assert axioms[2] == 'The player is a man'
     assert axioms[3] == 'The player is with a jersey'
     # assert axioms[4] == 'The player is with a jersey at a ball game'
+    return
+
+
+def test_prove_47(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_47.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms = main()
+    assert axioms[0] == 'The people is young'
+    assert axioms[1] == 'The people is a woman'
+    assert axioms[2] == 'The people is sparing'
+    assert axioms[3] == 'The people is in a kickboxing fight'  # false
     return
 
 
@@ -100,12 +128,36 @@ def test_prove_1161(monkeypatch):
     return
 
 
-# def test_prove_1010(monkeypatch):
-#     monkeypatch.setattr('sys.argv', [
-#         'scripts/prove.py', 'data/parsed/pair_1010.sem.xml', '--write',
-#         '--abduction', 'spsa'
-#     ])
-#     axioms = main()
-#     assert axioms[0] == ''
-#     assert axioms[1] == ''
-#     return
+def test_prove_1000(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_1000.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms = main()
+    assert axioms[0] == 'The boy is lowering a camera'
+    assert axioms[1] == 'The boy is facing a camera'
+    assert axioms[
+        2] == 'The boy is behind a front'  # composite word in_front_of
+    return
+
+
+def test_prove_10000(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_10000.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    # No match at all!
+    axioms = main()
+    return
+
+
+def test_prove_1010(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_1010.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms = main()
+    assert axioms[0] == 'The jockeys is race_2ing'
+    assert axioms[1] == 'The jockeys is on a field'
+    assert axioms[2] == 'The jockeys is race_2ing a field'
+    return

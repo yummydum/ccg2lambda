@@ -59,6 +59,7 @@ def main():
         args.abduction = AxiomsWordnet()
 
     if args.sick_all:
+        errors = 0
         for f in tqdm(sorted(list(args.sem.iterdir()))):
             print(f)
             args.sem = f
@@ -67,6 +68,8 @@ def main():
             except KeyboardInterrupt:
                 sys.exit(1)
             except:
+                errors += 1
+                print(f"Error! n={errors}")
                 continue
     else:
         created_axioms = prove(args)
@@ -93,6 +96,8 @@ def prove(args):
                 fout.write(hypothesis + '\n\n')
                 fout.write('Subgoals:\n')
                 for goal in theorem.theorems[0].subgoals:
+                    if goal.split(' ')[0] in theorem.theorems[0].neg_preds:
+                        goal += ' : False'
                     fout.write(goal + '\n')
                 fout.write('\n')
                 fout.write('Axioms:\n')

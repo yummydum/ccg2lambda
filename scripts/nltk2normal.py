@@ -6,10 +6,12 @@ import unicodedata
 from nltk.internals import Counter
 from logic_parser import lexpr
 
+
 class NCounter(Counter):
     def reset(self):
         self._value = 0
         return self._value
+
 
 _counter = NCounter()
 
@@ -32,6 +34,7 @@ _counter = NCounter()
 #   forall x.A   <AllExpression>
 #   True         <ConstantExpression>
 
+
 def get_atomic_formulas(expression):
     if isinstance(expression, ApplicationExpression):
         return set([expression])
@@ -40,8 +43,10 @@ def get_atomic_formulas(expression):
     elif isinstance(expression, AbstractVariableExpression):
         return set([expression])
     else:
-        return expression.visit(get_atomic_formulas,
-                       lambda parts: reduce(operator.or_, parts, set()))
+        return expression.visit(
+            get_atomic_formulas,
+            lambda parts: reduce(operator.or_, parts, set()))
+
 
 def get_role_formulas(expression):
     if isinstance(expression, EqualityExpression):
@@ -56,8 +61,10 @@ def get_role_formulas(expression):
     elif isinstance(expression, AbstractVariableExpression):
         return set()
     else:
-        return expression.visit(get_role_formulas,
-                       lambda parts: reduce(operator.or_, parts, set()))
+        return expression.visit(
+            get_role_formulas,
+            lambda parts: reduce(operator.or_, parts, set()))
+
 
 def new_variable(var):
     var = VariableExpression(var)
@@ -76,7 +83,9 @@ def new_variable(var):
     v = Variable("%s%s" % (prefix, _counter.get()))
     return v
 
+
 true_preds = ['True', 'TrueP']
+
 
 def remove_true(expression):
     # Remove True and TrueP
@@ -148,6 +157,7 @@ def remove_true(expression):
     else:
         expr = expression
     return expr
+
 
 def remove_true_(expression):
     # Remove True and TrueP
@@ -237,6 +247,7 @@ def remove_true_(expression):
         expr = expression
     return expr
 
+
 def rename_variable(expression):
     # Rename bound variables so that no variable with the same name is bound
     # by two different quantifiers in different parts of a formula
@@ -299,10 +310,12 @@ def rename_variable(expression):
         expr = expression
     return expr
 
+
 def rename(f):
     res = rename_variable(f)
     _counter.reset()
     return res
+
 
 def convert_to_prenex(expression):
     # Convert a formula to one where all existential quantifers come first.
@@ -310,6 +323,7 @@ def convert_to_prenex(expression):
     expression = rename_variable(expression)
     prenex_form = prenex_expr(expression)
     return prenex_form
+
 
 def prenex_expr(expression):
     if isinstance(expression, ApplicationExpression):
@@ -343,17 +357,20 @@ def prenex_expr(expression):
         expr = expression
     return expr
 
+
 def prenex_application_expr(expression):
     function = prenex_expr(expression.function)
     argument = prenex_expr(expression.argument)
     expr = ApplicationExpression(function, argument)
     return expr
 
+
 def prenex_equality_expr(expression):
     left = prenex_expr(expression.first)
     right = prenex_expr(expression.second)
     expr = EqualityExpression(left, right)
     return expr
+
 
 def prenex_and_expr(expression):
     left = prenex_expr(expression.first)
@@ -388,11 +405,13 @@ def prenex_and_expr(expression):
         expr = AndExpression(left, right)
     return expr
 
+
 def prenex_or_expr(expression):
     left = prenex_expr(expression.first)
     right = prenex_expr(expression.second)
     expr = OrExpression(left, right)
     return expr
+
 
 def prenex_imp_expr(expression):
     left = prenex_expr(expression.first)
@@ -400,10 +419,12 @@ def prenex_imp_expr(expression):
     expr = ImpExpression(left, right)
     return expr
 
+
 def prenex_not_expr(expression):
     term = prenex_expr(expression.term)
     expr = NegatedExpression(term)
     return expr
+
 
 def prenex_exists_expr(expression):
     variable = expression.variable
@@ -411,11 +432,13 @@ def prenex_exists_expr(expression):
     expr = ExistsExpression(variable, term)
     return expr
 
+
 def prenex_all_expr(expression):
     variable = expression.variable
     term = prenex_expr(expression.term)
     expr = AllExpression(variable, term)
     return expr
+
 
 def prenex_lambda_expr(expression):
     variable = expression.variable
@@ -423,13 +446,27 @@ def prenex_lambda_expr(expression):
     expr = LambdaExpression(variable, term)
     return expr
 
+
 def normalize_symbols(expression):
-  expression = expression.replace("’","").\
-               replace("_","").\
-               replace("（","BracketLeft").\
-               replace("）","BracketRight")
-  expression = unicodedata.normalize('NFKC', expression)
-  return expression
+    expression = expression.replace("’","").\
+                 replace("_","").\
+                 replace("（","BracketLeft").\
+                 replace("）","BracketRight")
+    expression = unicodedata.normalize('NFKC', expression)
+    return expression
+
+
+def get_negated_subtree(expression):
+    if isinstance(expression, ExistsExpression):
+        return get_negated_subtree(expression.term)
+    elif isinstance(expression, AndExpression):
+        first = get_negated_subtree(expression.first)
+        second = get_negated_subtree(expression.second)
+        return first + second
+    elif isinstance(expression, NegatedExpression):
+        return [expression]
+    else:
+        return []
 
 
 # Examples
@@ -465,20 +502,32 @@ neg2 = lexpr(r'- (_student(z1) & _run(z1))')
 neg3 = lexpr(r'_student(z1) & - (x = z1)')
 
 ex1 = lexpr(r'exists z1.(_student(z1) & _run(z1))')
-ex2 = lexpr(r'exists z1.(_student(z1) & _run(z1) & exists x.(boy(x) & like(z1,x)))')
+ex2 = lexpr(
+    r'exists z1.(_student(z1) & _run(z1) & exists x.(boy(x) & like(z1,x)))')
 ex3 = lexpr(r'exists x z1.(_student(z1) & _run(z1) & boy(x) & like(z1,x))')
 ex4 = lexpr(r'exists e x.(_run(z1) & boy(x) & like(z1,x))')
 ex5 = lexpr(r'exists e x.(_run(e) & boy(x) & (Subj(e) = x))')
 ex6 = lexpr(r'exists z1.(_student(z1) & exists x.(boy(x) & like(z1,x)))')
-ex7 = lexpr(r'exists e.(_come(e) & (Subj(e) = x) & exists x.(_party(x) & _to(e,x)))')
-ex8 = lexpr(r'exists e z1.(_come(z1) & (Subj(e) = z1) & exists z1.(_party(z1) & _to(e,z1)))')
-ex9 = lexpr(r'exists e y.(_run(e) & boy(y) & (Subj(e) = y)) & exists e y.(_run(e) & boy(y) & (Subj(e) = y))')
-ex10 = lexpr(r'exists e1 e2 x1 (_run(e1) & _walk(e2) & (Subj(e1) = x1) & (Subj(e2) = x1) & _boy(x1))')
-ex11 = lexpr(r'exists e1 e2 x1 (_歩く(e1) & _走る(e2) & (Subj(e1) = x1) & (Subj(e2) = x1) & _男の子(x1))')
+ex7 = lexpr(
+    r'exists e.(_come(e) & (Subj(e) = x) & exists x.(_party(x) & _to(e,x)))')
+ex8 = lexpr(
+    r'exists e z1.(_come(z1) & (Subj(e) = z1) & exists z1.(_party(z1) & _to(e,z1)))'
+)
+ex9 = lexpr(
+    r'exists e y.(_run(e) & boy(y) & (Subj(e) = y)) & exists e y.(_run(e) & boy(y) & (Subj(e) = y))'
+)
+ex10 = lexpr(
+    r'exists e1 e2 x1 (_run(e1) & _walk(e2) & (Subj(e1) = x1) & (Subj(e2) = x1) & _boy(x1))'
+)
+ex11 = lexpr(
+    r'exists e1 e2 x1 (_歩く(e1) & _走る(e2) & (Subj(e1) = x1) & (Subj(e2) = x1) & _男の子(x1))'
+)
 
 all1 = lexpr(r'forall x. (_student(x))')
 all2 = lexpr(r'forall x. (_student(x) -> _run(x))')
-all3 = lexpr(r'all x.(_student(x) -> exists e.(_come(e) & (Subj(e) = x) & exists x.(_party(x) & _to(e,x))))')
+all3 = lexpr(
+    r'all x.(_student(x) -> exists e.(_come(e) & (Subj(e) = x) & exists x.(_party(x) & _to(e,x))))'
+)
 
 tr1 = lexpr(r'True')
 tr2 = lexpr(r'True & (x = z1)')
@@ -491,32 +540,51 @@ lam4 = lexpr(r'\x.\y.sees(x,y)(john, mary)')
 lam5 = lexpr(r'all x.(man(x) & (\x.exists y.walks(x,y))(x))')
 lam6 = lexpr(r'(\P.\Q.exists x.(P(x) & Q(x)))(\x.dog(x))(\x.bark(x))')
 
-comp1 = lexpr(r'exists x.(_john(x) & True & exists z1.(_student(z1) & True & (x = z1)))')
-comp2 = lexpr(r'exists x.(_john(x) & True & exists e.(_come(e) & (Subj(e) = x) & exists x.(_party(x) & True & _to(e,x) & True)))')
-comp3 = lexpr(r'all x.(_student(x) -> (True -> exists e.(_come(e) & (Subj(e) = x) & exists x.(_party(x) & True & _to(e,x) & True))))')
-comp4 = lexpr(r'exists x.(_john(x) & True & exists z1.(_student(z1) & True & (x = z1)) & exists x.(_walk(x) & _with(x,z1)))')
+comp1 = lexpr(
+    r'exists x.(_john(x) & True & exists z1.(_student(z1) & True & (x = z1)))')
+comp2 = lexpr(
+    r'exists x.(_john(x) & True & exists e.(_come(e) & (Subj(e) = x) & exists x.(_party(x) & True & _to(e,x) & True)))'
+)
+comp3 = lexpr(
+    r'all x.(_student(x) -> (True -> exists e.(_come(e) & (Subj(e) = x) & exists x.(_party(x) & True & _to(e,x) & True))))'
+)
+comp4 = lexpr(
+    r'exists x.(_john(x) & True & exists z1.(_student(z1) & True & (x = z1)) & exists x.(_walk(x) & _with(x,z1)))'
+)
 comp5 = lexpr(r'exists x.(_john(x) & forall z1.(_student(z1) & rel(x,z1)))')
-comp6 = lexpr(r'(exists x.(_boy(x) & True & exists e.(_walk(e) & (Subj(e) = x) & True)) & exists x.(_girl(x) & True & exists e.(_walk(e) & (Subj(e) = x) & True)))')
-comp7 = lexpr(r'(exists x.(_john(x) & True & exists z1.(_coffee(z1) & True & exists e.(_drink(e) & (Subj(e) = x) & (Acc(e) = z1) & True))) & exists x.(_bob(x) & True & exists z1.(_coffee(z1) & True & exists e.(_drink(e) & (Subj(e) = x) & (Acc(e) = z1) & True))))')
-comp8 = lexpr(r'(exists x.(_boy(x) & True & exists z1.(_coffee(z1) & True & exists e.(_drink(e) & (Subj(e) = x) & (Acc(e) = z1) & True)) & exists z2.(_guitar(z2) & True & exists e.(_play(e) & (Subj(e) = x) & (Acc(e) = z2) & True))) & exists x.(_girl(x) & True & exists z1.(_coffee(z1) & True & exists e.(_drink(e) & (Subj(e) = x) & (Acc(e) = z1) & True)) & exists z2.(_guitar(z2) & True & exists e.(_play(e) & (Subj(e) = x) & (Acc(e) = z2) & True))))')
-comp9 = lexpr(r'(exists x.(_boy(x) & True & exists e.(_walk(e) & (Subj(e) = x) & exists x.(_park(x) & True & _in(e,x) & True))) & exists x.(_girl(x) & True & exists e.(_walk(e) & (Subj(e) = x) & exists x.(_park(x) & True & _in(e,x) & True))))')
-comp10 = lexpr(r'(exists x.(_john(x) & True & exists e.(_move(e) & (Subj(e) = x) & exists x.(_tokyo(x) & True & _from(e,x) & exists x.(_paris(x) & True & _to(e,x) & True)))) & exists x.(_bob(x) & True & exists e.(_move(e) & (Subj(e) = x) & exists x.(_tokyo(x) & True & _from(e,x) & exists x.(_paris(x) & True & _to(e,x) & True)))))')
-comp11 = lexpr(r'(exists x.(_boy(x) & True & exists e.(_walk(e) & (Subj(e) = x) & _slowly(e) & True)) & exists x.(_girl(x) & True & exists e.(_walk(e) & (Subj(e) = x) & _slowly(e) & True)))')
-comp12 = lexpr(r'(exists x.(_boy(x) & True & exists e.(_walk(e) & (Subj(e) = x) & _slowly(e) & exists x.(_park(x) & True & _in(e,x) & True))) & exists x.(_girl(x) & True & exists e.(_walk(e) & (Subj(e) = x) & _slowly(e) & exists x.(_park(x) & True & _in(e,x) & True))))')
-comp13 = lexpr(r'exists x.(_walking(x) & _man(x) & True & exists e.((Subj(e) = Subj(e)) & True))')
+comp6 = lexpr(
+    r'(exists x.(_boy(x) & True & exists e.(_walk(e) & (Subj(e) = x) & True)) & exists x.(_girl(x) & True & exists e.(_walk(e) & (Subj(e) = x) & True)))'
+)
+comp7 = lexpr(
+    r'(exists x.(_john(x) & True & exists z1.(_coffee(z1) & True & exists e.(_drink(e) & (Subj(e) = x) & (Acc(e) = z1) & True))) & exists x.(_bob(x) & True & exists z1.(_coffee(z1) & True & exists e.(_drink(e) & (Subj(e) = x) & (Acc(e) = z1) & True))))'
+)
+comp8 = lexpr(
+    r'(exists x.(_boy(x) & True & exists z1.(_coffee(z1) & True & exists e.(_drink(e) & (Subj(e) = x) & (Acc(e) = z1) & True)) & exists z2.(_guitar(z2) & True & exists e.(_play(e) & (Subj(e) = x) & (Acc(e) = z2) & True))) & exists x.(_girl(x) & True & exists z1.(_coffee(z1) & True & exists e.(_drink(e) & (Subj(e) = x) & (Acc(e) = z1) & True)) & exists z2.(_guitar(z2) & True & exists e.(_play(e) & (Subj(e) = x) & (Acc(e) = z2) & True))))'
+)
+comp9 = lexpr(
+    r'(exists x.(_boy(x) & True & exists e.(_walk(e) & (Subj(e) = x) & exists x.(_park(x) & True & _in(e,x) & True))) & exists x.(_girl(x) & True & exists e.(_walk(e) & (Subj(e) = x) & exists x.(_park(x) & True & _in(e,x) & True))))'
+)
+comp10 = lexpr(
+    r'(exists x.(_john(x) & True & exists e.(_move(e) & (Subj(e) = x) & exists x.(_tokyo(x) & True & _from(e,x) & exists x.(_paris(x) & True & _to(e,x) & True)))) & exists x.(_bob(x) & True & exists e.(_move(e) & (Subj(e) = x) & exists x.(_tokyo(x) & True & _from(e,x) & exists x.(_paris(x) & True & _to(e,x) & True)))))'
+)
+comp11 = lexpr(
+    r'(exists x.(_boy(x) & True & exists e.(_walk(e) & (Subj(e) = x) & _slowly(e) & True)) & exists x.(_girl(x) & True & exists e.(_walk(e) & (Subj(e) = x) & _slowly(e) & True)))'
+)
+comp12 = lexpr(
+    r'(exists x.(_boy(x) & True & exists e.(_walk(e) & (Subj(e) = x) & _slowly(e) & exists x.(_park(x) & True & _in(e,x) & True))) & exists x.(_girl(x) & True & exists e.(_walk(e) & (Subj(e) = x) & _slowly(e) & exists x.(_park(x) & True & _in(e,x) & True))))'
+)
+comp13 = lexpr(
+    r'exists x.(_walking(x) & _man(x) & True & exists e.((Subj(e) = Subj(e)) & True))'
+)
 
-test = [v1,v2,v3,
-        atom1,atom2,atom3,atom4,atom5,
-        nonatom1,nonatom2,
-        and1,and2,and3,
-        or1,or2,or3,
-        imp1,imp2,imp3,
-        neg1,neg2,neg3,
-        ex1,ex2,ex3,ex4,ex5,ex6,ex7,ex8,ex9,
-        all1,all2,all3,
-        tr1,tr2,tr3,
-        lam1,lam2,lam3,lam4,lam5,lam6,
-        comp1,comp2,comp3,comp4,comp5,comp6,comp7,comp8,comp9,comp10,comp11,comp12,comp13]
+test = [
+    v1, v2, v3, atom1, atom2, atom3, atom4, atom5, nonatom1, nonatom2, and1,
+    and2, and3, or1, or2, or3, imp1, imp2, imp3, neg1, neg2, neg3, ex1, ex2,
+    ex3, ex4, ex5, ex6, ex7, ex8, ex9, all1, all2, all3, tr1, tr2, tr3, lam1,
+    lam2, lam3, lam4, lam5, lam6, comp1, comp2, comp3, comp4, comp5, comp6,
+    comp7, comp8, comp9, comp10, comp11, comp12, comp13
+]
+
 
 def demo(function):
     for formula in test:
