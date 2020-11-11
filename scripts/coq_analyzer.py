@@ -314,10 +314,11 @@ def get_tree_pred_args2(line, is_conclusion=False):
         tree_args = parse_coq_line(' '.join(line.split()[2:]))
     else:
         tree_args = parse_coq_line(line)
+
     if tree_args is None or len(tree_args) < 1:
         return None
     if tree_args.height() >= 3:
-        return tree_args[0]  # return subtree
+        return tree_args
     else:
         return tree_args.leaves()  # return leave args (list, str)
 
@@ -389,6 +390,8 @@ def make_graph(theorem, premises, subgoals):
 
     for premise in premises:
         if '=' in premise:
+            if len(premise.split()) != 4:
+                continue  # ignore for now?
             name, event, _, entity = premise.split()
             graph.addRelation(event, entity, name)
 
@@ -415,7 +418,7 @@ def get_matched_premises(theorem):
     theorem.subgoals = subgoals
     premises, subgoals, negation = preprocess(theorem, premise_lines,
                                               conclusion, subgoals)
-    if len(subgoals) > 5:
+    if len(subgoals) >= 10:
         return {}
     graph = make_graph(theorem, premises, subgoals)
     # graph.visualize()
@@ -447,45 +450,54 @@ def get_subgoals_from_coq_output2(coq_output_lines):
 def preprocess_sr(premises, subgoals):
     premises = sorted(premises, key=lambda x: len(x.split('(')))
     events = set()
-    max_ind = 100  # fix this
+    max_ind = 100  # fix this?
     result = []
     replace_dict = {}
     for p in premises:
         arg = get_tree_pred_args2(p)
         if isinstance(arg, Tree):
-            label = arg.label()
-            leave = arg.leaves()
-            assert len(leave) == 1
-            event = leave[0]
-            assert event in events
-            original = f'({label} {event})'
-            if original in replace_dict:
-                ent = replace_dict[original]
-            else:
-                ent = f'x{max_ind}'
-                replace_dict[original] = ent
-                max_ind += 1
+            for elem in arg:
 
-            result.append(p.replace(original, ent))
-            result.append(f'{label} {event} = {ent}')
-            for i in range(len(subgoals)):
-                subgoals[i] = subgoals[i].replace(original, ent)
+                if isinstance(elem, Tree):
+                    label = elem.label()
+                    leave = elem.leaves()
+                    event = leave[0]
+                    # assert event in events
+                    original = f'({label} {event})'
+
+                    if original in replace_dict:
+                        ent = replace_dict[original]
+                    else:
+                        ent = f'x{max_ind}'
+                        replace_dict[original] = ent
+                        max_ind += 1
+
+                    result.append(p.replace(original, ent))
+                    result.append(f'{label} {event} = {ent}')
+                    for i in range(len(subgoals)):
+                        subgoals[i] = subgoals[i].replace(original, ent)
+
+                else:
+                    if elem.startswith('e'):
+                        events.add(x)
 
         elif isinstance(arg, list):
             for x in arg:
                 if x.startswith('e'):
                     events.add(x)
             result.append(p)
+
         else:
-            ValueError()
+            raise ValueError()
 
     max_ind = 200
     for i in range(len(subgoals)):
         temp = f'H : {subgoals[i]}'
         arg = get_tree_pred_args2(temp)
         if isinstance(arg, Tree):
-            label = arg.label()
-            event = arg.leaves()[0]
+            tree = arg[0]
+            label = tree.label()
+            event = tree.leaves()[0]
             original = f'({label} {event})'
             ent = f'?x{max_ind}'
             subgoals[i] = subgoals[i].replace(original, ent)
@@ -498,12 +510,14 @@ def preprocess_variables(premises, subgoals):
     type_prop = [x for x in premises if x.endswith('Event')]
     for t in type_prop:
         var = t.split(' : ')[0]
-        e = f'e{var[1:]}'
-        # Replace x to e
-        for i in range(len(premises)):
-            premises[i] = premises[i].replace(var, e)
-        for i in range(len(subgoals)):
-            subgoals[i] = subgoals[i].replace(var, e)
+        for x in var.split(','):
+            x = x.strip(' ')
+            e = x.replace('x', 'e')
+            # Replace x to e
+            for i in range(len(premises)):
+                premises[i] = premises[i].replace(x, e)
+            for i in range(len(subgoals)):
+                subgoals[i] = subgoals[i].replace(x, e)
 
     # Filter True and Event
     premises = [

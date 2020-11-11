@@ -161,3 +161,50 @@ def test_prove_1010(monkeypatch):
     assert axioms[1] == 'The jockeys is on a field'
     assert axioms[2] == 'The jockeys is race_2ing a field'
     return
+
+
+def test_prove_1016(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_1016.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms = main()
+    assert axioms[0] == 'The grass is a field'
+    assert axioms[1] == 'The racer is a jockeys'
+    assert axioms[2] == 'The racer is racing'
+    assert axioms[3] == 'The racer is yelling a horse'
+    return
+
+
+def test_prove_232(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_232.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms = main()
+    assert axioms[0] == 'The kid is dance_2ing'
+    return
+
+
+def test_prove_2350(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_2350.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms = main()
+    assert axioms[0] == 'The lady is a woman'
+    assert axioms[1] == 'The lady is removing a cheese to a sauce'
+    assert axioms[2] == 'The lady is from a sauce'
+    return
+
+
+def test_prove_975():
+    return
+
+
+def test_prove_9760():
+    return
+
+
+def test_prove_9148():
+    return

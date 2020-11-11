@@ -201,7 +201,11 @@ class Graph:
             rel = rel.lower()
             rel2 = rel2.lower()
 
-            subj = node1.subj.matched.core_pred.name
+            if node1.subj.subgoal:
+                subj = node1.subj.matched.core_pred.name
+            else:
+                subj = node1.subj.core_pred.name
+
             verb = node1.core_pred
             target = getattr(node2, rel2).core_pred.name
             axiom = f'The {subj} is {progressive(verb).name} a {target}'
@@ -479,7 +483,7 @@ class Event:
                 else:
                     dat = self.dat.core_pred.name
             else:
-                if self.dat.matched_by is not None:
+                if self.dat.matched_by is not None and self.dat.matched_by.core_pred is not None:
                     dat = self.dat.matched_by.core_pred.name
                 else:
                     dat = self.dat.core_pred.name
