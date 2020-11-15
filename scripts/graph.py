@@ -7,8 +7,7 @@ class Graph:
         self.events = dict()
         self.predicate = dict()
         self.relation_subgoal = []
-        self.subgoals = dict(
-        )  # mark which subgoals are processed by the generated sentence
+        self.checked_subgoals = []
 
     def addPred(self, i, name, pos, arg, subgoal):
         if name in self.predicate:
@@ -101,12 +100,16 @@ class Graph:
                 subgoal = pred.name
                 if pred.pos.startswith('NN'):
                     subgoal = f'a {subgoal}'
-                elif pred.pos.startswith('JJ'):
-                    pass
-                else:
+
+                # skip preposition subgoal here
+                elif pred.pos == 'IN':
                     continue
+                else:
+                    pass
+
                 axiom = f'The {e.matched.core_pred.name} is {subgoal}'
                 result.append(axiom)
+                self.checked_subgoals.append(pred.name)
         return result
 
     def from_unmatched_entities(self):
@@ -128,10 +131,15 @@ class Graph:
                 if pred.pos.startswith('V'):
                     verb = progressive(pred).name
                     axiom = f'The {subject} is {e.get_pr(verb)}'
-                    result.append(axiom)
                 elif pred.pos.startswith('RB'):
-                    axiom = f'The {subject} is doing something {pred.name}'
-                    result.append(axiom)
+                    axiom = f'The {subject} is {e.get_pr(verb)} {pred.name}'
+                elif pred.pos.startswith('NN'):
+                    axiom = f'The {subject} is {pred.name}'
+                else:
+                    continue
+
+                result.append(axiom)
+                self.checked_subgoals.append(pred.name)
 
             for prop in e.get_props():
                 for arg in prop.arg:
@@ -146,6 +154,7 @@ class Graph:
                 else:
                     axiom = f'The {subject} is {prop.name} {arg.get_all_pred_str()}'
                 result.append(axiom)
+                self.checked_subgoals.append(prop.name)
         return result
 
     def from_unmatched_events(self):
@@ -169,10 +178,12 @@ class Graph:
                 if pred.pos.startswith('V'):
                     verb = progressive(pred).name
                     axiom = f'The {subject} is {e.get_pr(verb)}'
-                    result.append(axiom)
                 elif pred.pos.startswith('RB'):
                     axiom = f'The {subject} is doing something {pred.name}'
-                    result.append(axiom)
+                else:
+                    continue
+                result.append(axiom)
+                self.checked_subgoals.append(pred.name)
 
             for prop in e.get_props():
                 for arg in prop.arg:
@@ -187,6 +198,7 @@ class Graph:
                 else:
                     axiom = f'The {subject} is {prop.name} {arg.get_all_pred_str()}'
                 result.append(axiom)
+                self.checked_subgoals.append(prop.name)
         return result
 
     def from_pr_subgoal(self):
@@ -209,8 +221,8 @@ class Graph:
             verb = node1.core_pred
             target = getattr(node2, rel2).core_pred.name
             axiom = f'The {subj} is {progressive(verb).name} a {target}'
-
             result.append(axiom)
+            self.checked_subgoals.append(goal)
         return result
 
     def parseRel(self, name):
@@ -373,7 +385,6 @@ class Entity:
     def addPred(self, p):
         assert isinstance(p, Predicate)
         self.predicates.append(p)
-
         if p.pos.startswith('NN'):
             self.core_pred = p
         if len(p.arg) == 2:

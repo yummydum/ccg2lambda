@@ -60,17 +60,30 @@ def main():
 
     if args.sick_all:
         errors = 0
+        stats = {}
+        stats["n"] = {}
+        stats["proved"] = 0
         for f in tqdm(sorted(list(args.sem.iterdir()))):
             print(f)
             args.sem = f
             try:
-                prove(args)
+                axioms, is_proved = prove(args)
+                n = len(axioms)
+                if n not in stats["n"]:
+                    stats["n"][n] = 0
+                stats["n"][n] += 1
+
+                if is_proved:
+                    stats["proved"] += 1
+
             except KeyboardInterrupt:
                 sys.exit(1)
             except:
                 errors += 1
                 print(f"Error! n={errors}")
                 continue
+        with codecs.open('data/stats.txt', 'w', 'utf-8') as fout:
+            fout.write(str(stats))
     else:
         created_axioms = prove(args)
         return created_axioms
@@ -82,9 +95,14 @@ def prove(args):
     docs = root.findall('.//document')
     for doc in docs:
         theorem = prove_doc(doc, args.abduction, args)
+        if theorem.theorems[0].inference_result:
+            print('proved')
+            return {}, True
+
         premise = clean(theorem.theorems[0].premises[0])
         hypothesis = clean(theorem.theorems[0].conclusion)
         created_axioms = theorem.theorems[0].created_axioms
+
         if args.write:
             ab_output = str(args.sem).replace('parsed',
                                               'subgoal_matched').replace(
@@ -103,7 +121,21 @@ def prove(args):
                 fout.write('Axioms:\n')
                 for text in created_axioms:
                     fout.write(text + '\n')
-    return created_axioms
+
+            with codecs.open('data/generated_axioms.csv', 'w',
+                             'utf-8') as fout:
+                premise = ' '.join([x for x in theorem.theorems[0].pos.keys()])
+                hypothesis = ' '.join(
+                    [x for x in theorem.theorems[0].pos2.keys()])
+                fout.write(args.sem.name + '\n')
+                fout.write(premise + '\n')
+                fout.write(hypothesis + '\n')
+                fout.write('Axioms:\n')
+                for text in created_axioms:
+                    fout.write(text + '\n')
+                fout.write('\n\n')
+
+    return created_axioms, False
 
 
 if __name__ == '__main__':

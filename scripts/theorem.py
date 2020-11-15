@@ -231,19 +231,20 @@ class Theorem(object):
         if abduction and self.result == 'unknown' and self.doc is not None:
             abduction.attempt(self)
 
-        # Accumulate failure info
-        self.created_axioms = get_matched_premises(self)
-
         # Reverse theorem
-        rev_theorem = self.reverse()
-        if rev_theorem is None:
-            return
+        # rev_theorem = self.reverse()
+        # if rev_theorem is not None:
+        #     rev_theorem.prove_simple()
+        #     if rev_theorem.inference_result is False:
+        #         rev_neg_theorem = self.reverse(is_negated=True)
+        #         rev_neg_theorem.prove_simple()
+
+        # Accumulate failure info
+        if not self.inference_result:
+            self.created_axioms = get_matched_premises(self)
         else:
-            rev_theorem.prove_simple()
-            if rev_theorem.inference_result is False:
-                rev_neg_theorem = self.reverse(is_negated=True)
-                rev_neg_theorem.prove_simple()
-            return
+            self.created_axioms = {}
+        return
 
     def get_subgoals(self, abduction=None):
         for theorem in self.variations:
@@ -478,7 +479,7 @@ def negate_conclusion(conclusion):
 # In that case, we return True. Otherwise, we return False.
 def is_theorem_defined(output_lines):
     for output_line in output_lines:
-        if len(output_line) > 2 and 'is defined' in output_line:
+        if len(output_line) > 2 and 'No more subgoals.' in output_line:
             return True
     return False
 
