@@ -59,23 +59,22 @@ def main():
         args.abduction = AxiomsWordnet()
 
     if args.sick_all:
+
+        pred = {}
+        goal_num = {}
+
         errors = 0
-        stats = {}
-        stats["n"] = {}
-        stats["proved"] = 0
         for f in tqdm(sorted(list(args.sem.iterdir()))):
             print(f)
+            i = int(f.name.rstrip(".sem.xml").lstrip("pair_"))
             args.sem = f
             try:
                 axioms, is_proved = prove(args)
-                n = len(axioms)
-                if n not in stats["n"]:
-                    stats["n"][n] = 0
-                stats["n"][n] += 1
-
+                goal_num[i] = len(axioms)
                 if is_proved:
-                    stats["proved"] += 1
-
+                    pred[i] = 1
+                else:
+                    pred[i] = 0
             except KeyboardInterrupt:
                 sys.exit(1)
             except:
@@ -83,7 +82,10 @@ def main():
                 print(f"Error! n={errors}")
                 continue
         with codecs.open('data/stats.txt', 'w', 'utf-8') as fout:
-            fout.write(str(stats))
+            fout.write(str(pred))
+            ftou.write("\n")
+            fout.write(str(goal_num))
+
     else:
         created_axioms = prove(args)
         return created_axioms

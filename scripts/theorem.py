@@ -99,14 +99,18 @@ class Theorem(object):
 
     def pos_from_doc(self, doc):
         self.pos = OrderedDict()
+        self.surf = OrderedDict()
         tokens = doc.xpath('./sentences/sentence[1]/tokens')[0]
         for tok in tokens:
             self.pos[tok.attrib.get('base')] = tok.attrib.get('pos')
+            self.surf[tok.attrib.get('base')] = tok.attrib.get('surf')
 
         tokens = doc.xpath('./sentences/sentence[2]/tokens')[0]
         self.pos2 = OrderedDict()
+        self.surf2 = OrderedDict()
         for tok in tokens:
             self.pos2[tok.attrib.get('base')] = tok.attrib.get('pos')
+            self.surf2[tok.attrib.get('base')] = tok.attrib.get('surf')
         return
 
     def copy(self,
@@ -228,6 +232,9 @@ class Theorem(object):
         if self.inference_result is False:
             neg_theorem = self.negate()
             neg_theorem.prove_simple()
+            if neg_theorem.inference_result:
+                self.inference_result = True
+
         if abduction and self.result == 'unknown' and self.doc is not None:
             abduction.attempt(self)
 

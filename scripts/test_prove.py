@@ -8,7 +8,7 @@ def test_prove_1(monkeypatch):
         '--abduction', 'spsa'
     ])
     axioms, is_proved = main()
-    assert axioms[0] == 'The kid is a boy'
+    assert axioms[0] == 'The kids is a boys'
     return
 
 
@@ -20,10 +20,11 @@ def test_prove_2(monkeypatch):
     axioms, is_proved = main()
     assert axioms[0] == 'The house is a yard'
     assert axioms[1] == 'The house is a background'
-    assert axioms[2] == 'The child is a man'
-    assert axioms[3] == 'The child is old'
-    assert axioms[4] == 'The child is a kid'
-    assert axioms[5] == 'The child is standing'
+    assert axioms[2] == 'The children is a man'
+    assert axioms[3] == 'The children is old'
+    assert axioms[4] == 'The children is a kids'
+    assert axioms[5] == 'The children is standing'
+    # should be 'The man is old'
     return
 
 
@@ -33,9 +34,9 @@ def test_prove_3(monkeypatch):
         '--abduction', 'spsa'
     ])
     axioms, is_proved = main()
-    assert axioms[0] == 'The boy is a kid'
+    assert axioms[0] == 'The boys is a kids'
     assert axioms[1] == 'The man is with a smile_2'
-    assert axioms[2] == 'The boy is near a man'
+    assert axioms[2] == 'The boys is near a man'
     return
 
 
@@ -58,8 +59,8 @@ def test_prove_5(monkeypatch):
         '--abduction', 'spsa'
     ])
     axioms, is_proved = main()
-    assert axioms[0] == 'The dog is hugging'
-    assert axioms[1] == 'The dog is wrestling'
+    assert axioms[0] == 'The dogs is hugging'
+    assert axioms[1] == 'The dogs is wrestling'
     return
 
 
@@ -69,10 +70,10 @@ def test_prove_26(monkeypatch):
         '--abduction', 'spsa'
     ])
     axioms, is_proved = main()
-    assert axioms[0] == 'The bicycle is a trick'
+    assert axioms[0] == 'The bicycle is a tricks'
     assert axioms[1] == 'The wheel is a motorbike'
     assert axioms[2] == 'The person is a man'
-    assert axioms[3] == 'The person is doing a trick'
+    assert axioms[3] == 'The person is doing a tricks'
     assert axioms[4] == 'The person is in a black jacket'
     return
 
@@ -91,6 +92,16 @@ def test_prove_40(monkeypatch):
     return
 
 
+def test_prove_42(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_42.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms, is_proved = main()
+    breakpoint()
+    return
+
+
 def test_prove_47(monkeypatch):
     monkeypatch.setattr('sys.argv', [
         'scripts/prove.py', 'data/parsed/pair_47.sem.xml', '--write',
@@ -98,9 +109,59 @@ def test_prove_47(monkeypatch):
     ])
     axioms, is_proved = main()
     assert axioms[0] == 'The people is young'
-    assert axioms[1] == 'The people is a woman'
+    assert axioms[1] == 'The people is a women'
     assert axioms[2] == 'The people is sparing'
     assert axioms[3] == 'The people is in a kickboxing fight'  # false
+    return
+
+
+def test_prove_100(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_100.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms, is_proved = main()
+    breakpoint()
+    return
+
+
+def test_prove_129(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_129.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms, is_proved = main()
+    assert is_proved
+    return
+
+
+def test_prove_140(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_140.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms, is_proved = main()
+    assert is_proved
+    return
+
+
+def test_prove_141(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_141.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms, is_proved = main()
+    assert is_proved
+    return
+
+
+def test_prove_161(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_161.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms, is_proved = main()
+    assert is_proved
     return
 
 
@@ -112,7 +173,17 @@ def test_prove_186(monkeypatch):
     axioms, is_proved = main()
     assert axioms[0] == 'The people is asian'
     assert axioms[1] == 'The people is large'
-    assert axioms[2] == 'The people is at a table'
+    assert axioms[2] == 'The people is at a tables'
+    return
+
+
+def test_prove_254(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_254.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms, is_proved = main()
+    assert is_proved
     return
 
 
@@ -134,8 +205,8 @@ def test_prove_1161(monkeypatch):
         '--abduction', 'spsa'
     ])
     axioms, is_proved = main()
-    assert axioms[0] == 'The egg is a ingredient'
-    assert axioms[1] == 'The woman is adding a ingredient to a bowl'
+    assert axioms[0] == 'The eggs is a ingredients'
+    assert axioms[1] == 'The woman is adding a ingredients to a bowl'
     return
 
 
@@ -181,9 +252,9 @@ def test_prove_1016(monkeypatch):
     ])
     axioms, is_proved = main()
     assert axioms[0] == 'The grass is a field'
-    assert axioms[1] == 'The racer is a jockeys'
-    assert axioms[2] == 'The racer is racing'
-    assert axioms[3] == 'The racer is yelling a horse'
+    assert axioms[1] == 'The racers is a jockeys'
+    assert axioms[2] == 'The racers is racing'
+    assert axioms[3] == 'The racers is yelling a horses'
     return
 
 
@@ -193,7 +264,7 @@ def test_prove_232(monkeypatch):
         '--abduction', 'spsa'
     ])
     axioms, is_proved = main()
-    assert axioms[0] == 'The kid is dance_2ing'
+    assert axioms[0] == 'The kids is dance_2ing'
     return
 
 
@@ -219,3 +290,6 @@ def test_prove_9760():
 
 def test_prove_9148():
     return
+
+
+# lexical contradiction is not handled now!

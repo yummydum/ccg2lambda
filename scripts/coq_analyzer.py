@@ -376,8 +376,9 @@ def make_graph(theorem, premises, subgoals):
             pred_name = premise.split(' ')[0].split('_')[1]
             arg = premise.split(' ')[1:]
             i = original_text.index(pred_name)
+            surf = theorem.surf[pred_name]
             pos = theorem.pos[pred_name]
-            graph.addPred(i, pred_name, pos, arg, subgoal=False)
+            graph.addPred(i, pred_name, pos, arg, surf, subgoal=False)
 
     original_text = list(theorem.pos2.keys())
     for goal in subgoals:
@@ -385,8 +386,9 @@ def make_graph(theorem, premises, subgoals):
             pred_name = goal.split(' ')[0].split('_')[1]
             arg = goal.split(' ')[1:]
             i = original_text.index(pred_name)
+            surf = theorem.surf2[pred_name]
             pos = theorem.pos2[pred_name]
-            graph.addPred(i, pred_name, pos, arg, subgoal=True)
+            graph.addPred(i, pred_name, pos, arg, surf, subgoal=True)
 
     for premise in premises:
         if '=' in premise:

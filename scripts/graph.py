@@ -9,10 +9,10 @@ class Graph:
         self.relation_subgoal = []
         self.checked_subgoals = []
 
-    def addPred(self, i, name, pos, arg, subgoal):
+    def addPred(self, i, name, pos, arg, surf, subgoal):
         if name in self.predicate:
             name = f'{name}_2'  # fix this
-        pred = Predicate(i, name, pos, arg, subgoal, self)
+        pred = Predicate(i, name, pos, arg, subgoal, surf, self)
         self.predicate[pred.name] = pred
         return
 
@@ -97,7 +97,7 @@ class Graph:
         e_list = [e for e in self.entities.values() if e.subgoal and e.matched]
         for e in e_list:
             for pred in e.predicates:
-                subgoal = pred.name
+                subgoal = pred.surf
                 if pred.pos.startswith('NN'):
                     subgoal = f'a {subgoal}'
 
@@ -107,9 +107,9 @@ class Graph:
                 else:
                     pass
 
-                axiom = f'The {e.matched.core_pred.name} is {subgoal}'
+                axiom = f'The {e.matched.core_pred.surf} is {subgoal}'
                 result.append(axiom)
-                self.checked_subgoals.append(pred.name)
+                self.checked_subgoals.append(pred.surf)
         return result
 
     def from_unmatched_entities(self):
@@ -125,16 +125,16 @@ class Graph:
         result = []
         e_list = [e for e in self.events.values() if e.subgoal and e.matched]
         for e in e_list:
-            subject = e.matched.subj.core_pred.name
+            subject = e.matched.subj.core_pred.surf
             # verb advb subgoal
             for pred in e.predicates:
                 if pred.pos.startswith('V'):
                     verb = progressive(pred).name
                     axiom = f'The {subject} is {e.get_pr(verb)}'
                 elif pred.pos.startswith('RB'):
-                    axiom = f'The {subject} is {e.get_pr(verb)} {pred.name}'
+                    axiom = f'The {subject} is {e.get_pr(verb)} {pred.surf}'
                 elif pred.pos.startswith('NN'):
-                    axiom = f'The {subject} is {pred.name}'
+                    axiom = f'The {subject} is {pred.surf}'
                 else:
                     continue
 
@@ -148,13 +148,13 @@ class Graph:
 
                 # Use the matched entity for prop arg
                 if arg.matched is not None:
-                    axiom = f'The {subject} is {prop.name} a {arg.matched.core_pred.name}'
+                    axiom = f'The {subject} is {prop.surf} a {arg.matched.core_pred.surf}'
 
                 # Use core pred itself if unmatched (these are unmatched subgoal via propositon)
                 else:
-                    axiom = f'The {subject} is {prop.name} {arg.get_all_pred_str()}'
+                    axiom = f'The {subject} is {prop.surf} {arg.get_all_pred_str()}'
                 result.append(axiom)
-                self.checked_subgoals.append(prop.name)
+                self.checked_subgoals.append(prop.surf)
         return result
 
     def from_unmatched_events(self):
@@ -172,14 +172,14 @@ class Graph:
             elif e.subj.matched is None:
                 continue
 
-            subject = e.subj.matched.core_pred.name
+            subject = e.subj.matched.core_pred.surf
             # verb advb subgoal
             for pred in e.predicates:
                 if pred.pos.startswith('V'):
                     verb = progressive(pred).name
                     axiom = f'The {subject} is {e.get_pr(verb)}'
                 elif pred.pos.startswith('RB'):
-                    axiom = f'The {subject} is doing something {pred.name}'
+                    axiom = f'The {subject} is doing something {pred.surf}'
                 else:
                     continue
                 result.append(axiom)
@@ -192,11 +192,11 @@ class Graph:
 
                 # Use the matched entity for prop arg
                 if arg.matched is not None:
-                    axiom = f'The {subject} is {prop.name} a {arg.matched.core_pred.name}'
+                    axiom = f'The {subject} is {prop.surf} a {arg.matched.core_pred.surf}'
 
                 # Use core pred itself if unmatched (these are unmatched subgoal via propositon)
                 else:
-                    axiom = f'The {subject} is {prop.name} {arg.get_all_pred_str()}'
+                    axiom = f'The {subject} is {prop.surf} {arg.get_all_pred_str()}'
                 result.append(axiom)
                 self.checked_subgoals.append(prop.name)
         return result
@@ -214,12 +214,12 @@ class Graph:
             rel2 = rel2.lower()
 
             if node1.subj.subgoal:
-                subj = node1.subj.matched.core_pred.name
+                subj = node1.subj.matched.core_pred.surf
             else:
-                subj = node1.subj.core_pred.name
+                subj = node1.subj.core_pred.surf
 
             verb = node1.core_pred
-            target = getattr(node2, rel2).core_pred.name
+            target = getattr(node2, rel2).core_pred.surf
             axiom = f'The {subj} is {progressive(verb).name} a {target}'
             result.append(axiom)
             self.checked_subgoals.append(goal)
@@ -285,9 +285,10 @@ class Graph:
 
 
 class Predicate():
-    def __init__(self, i, name, pos, arg, subgoal, graph):
+    def __init__(self, i, name, pos, arg, subgoal, surf, graph):
         self.i = i
         self.name = name
+        self.surf = surf.lower()
         self.pos = pos
         self.graph = graph
         self.subgoal = subgoal
@@ -463,15 +464,15 @@ class Event:
         if hasattr(self, 'acc'):
             if self.acc.subgoal:
                 if self.acc.matched is not None:
-                    acc = self.acc.matched.core_pred.name
+                    acc = self.acc.matched.core_pred.surf
                 # unmatched acc which only exists in conclusion
                 else:
-                    acc = self.acc.core_pred.name
+                    acc = self.acc.core_pred.surf
             else:
                 if self.acc.matched_by is not None:
-                    acc = self.acc.matched_by.core_pred.name
+                    acc = self.acc.matched_by.core_pred.surf
                 else:
-                    acc = self.acc.core_pred.name
+                    acc = self.acc.core_pred.surf
             verb += f' a {acc}'
 
         # if not check matched event in premise
@@ -479,25 +480,25 @@ class Event:
         elif hasattr(self.matched, 'acc'):
             breakpoint()
             if self.matched.acc.matched_by is not None:
-                acc = self.matched.acc.matched_by.core_pred.name
+                acc = self.matched.acc.matched_by.core_pred.surf
             else:
-                acc = self.matched.acc.core_pred.name
+                acc = self.matched.acc.core_pred.surf
             verb += f' a {acc}'
 
         if hasattr(self, 'dat'):
             if self.dat.subgoal:
 
                 if self.dat.matched is not None:
-                    dat = self.dat.matched.core_pred.name
+                    dat = self.dat.matched.core_pred.surf
 
                 # unmatched dat which only exists in conclusion
                 else:
-                    dat = self.dat.core_pred.name
+                    dat = self.dat.core_pred.surf
             else:
                 if self.dat.matched_by is not None and self.dat.matched_by.core_pred is not None:
-                    dat = self.dat.matched_by.core_pred.name
+                    dat = self.dat.matched_by.core_pred.surf
                 else:
-                    dat = self.dat.core_pred.name
+                    dat = self.dat.core_pred.surf
             verb += f' to a {dat}'
 
         # if not check matched event in premise
@@ -505,9 +506,9 @@ class Event:
         elif hasattr(self.matched, 'dat'):
             breakpoint()
             if self.matched.dat.matched_by is not None:
-                dat = self.matched.dat.matched_by.core_pred.name
+                dat = self.matched.dat.matched_by.core_pred.surf
             else:
-                dat = self.matched.dat.core_pred.name
+                dat = self.matched.dat.core_pred.surf
             verb += f' to a {dat}'
 
         return verb
