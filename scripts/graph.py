@@ -97,17 +97,24 @@ class Graph:
         e_list = [e for e in self.entities.values() if e.subgoal and e.matched]
         for e in e_list:
             for pred in e.predicates:
+
+                subj = e.matched.core_pred
                 subgoal = pred.surf
-                if pred.pos.startswith('NN'):
-                    subgoal = f'a {subgoal}'
 
-                # skip preposition subgoal here
-                elif pred.pos == 'IN':
+                if pred.pos == 'IN':
                     continue
-                else:
-                    pass
 
-                axiom = f'The {e.matched.core_pred.surf} is {subgoal}'
+                if subj.pos in {'NN', 'NNP'}:
+                    copula = 'is'
+                else:
+                    copula = 'are'
+
+                if pred.pos in {'NN', 'NNP'}:
+                    det = f' a '
+                else:
+                    det = ' '
+
+                axiom = f'The {e.matched.core_pred.surf} {copula}{det}{subgoal}'
                 result.append(axiom)
                 self.checked_subgoals.append(pred.surf)
         return result
@@ -125,16 +132,27 @@ class Graph:
         result = []
         e_list = [e for e in self.events.values() if e.subgoal and e.matched]
         for e in e_list:
-            subject = e.matched.subj.core_pred.surf
+            subject = e.matched.subj.core_pred
+
+            if subject.pos in {'NNS', 'NNPS'}:
+                copula = 'are'
+            else:
+                copula = 'is'
+
             # verb advb subgoal
             for pred in e.predicates:
+
                 if pred.pos.startswith('V'):
                     verb = progressive(pred).name
-                    axiom = f'The {subject} is {e.get_pr(verb)}'
+                    axiom = f'The {subject.surf} {copula} {e.get_pr(verb)}'
                 elif pred.pos.startswith('RB'):
-                    axiom = f'The {subject} is {e.get_pr(verb)} {pred.surf}'
-                elif pred.pos.startswith('NN'):
-                    axiom = f'The {subject} is {pred.surf}'
+                    axiom = f'The {subject.surf} {copula} {e.get_pr(verb)} {pred.surf}'
+
+                elif pred.pos in {'NN', 'NNS'}:
+                    axiom = f'The {subject.surf} {copula} a {pred.surf}'
+                elif pred.pos == {'NNP', 'NNPS'}:
+                    axiom = f'The {subject.surf} {copula} {pred.surf}'
+
                 else:
                     continue
 
@@ -148,11 +166,10 @@ class Graph:
 
                 # Use the matched entity for prop arg
                 if arg.matched is not None:
-                    axiom = f'The {subject} is {prop.surf} a {arg.matched.core_pred.surf}'
-
+                    axiom = f'The {subject.surf} {copula} {prop.surf} a {arg.matched.core_pred.surf}'
                 # Use core pred itself if unmatched (these are unmatched subgoal via propositon)
                 else:
-                    axiom = f'The {subject} is {prop.surf} {arg.get_all_pred_str()}'
+                    axiom = f'The {subject.surf} {copula} {prop.surf} {arg.get_all_pred_str()}'
                 result.append(axiom)
                 self.checked_subgoals.append(prop.surf)
         return result
@@ -172,16 +189,24 @@ class Graph:
             elif e.subj.matched is None:
                 continue
 
-            subject = e.subj.matched.core_pred.surf
+            subject = e.subj.matched.core_pred
+            if subject.pos in {'NN', 'NNP'}:
+                copula = 'is'
+            elif subject.pos in {'NNS', 'NNPS'}:
+                copula = 'are'
+            else:
+                copula = 'is'
+
             # verb advb subgoal
             for pred in e.predicates:
                 if pred.pos.startswith('V'):
                     verb = progressive(pred).name
-                    axiom = f'The {subject} is {e.get_pr(verb)}'
+                    axiom = f'The {subject.surf} {copula} {e.get_pr(verb)}'
                 elif pred.pos.startswith('RB'):
-                    axiom = f'The {subject} is doing something {pred.surf}'
+                    axiom = f'The {subject.surf} {copula} {e.get_pr(verb)} {pred.surf}'
                 else:
                     continue
+
                 result.append(axiom)
                 self.checked_subgoals.append(pred.name)
 
@@ -192,11 +217,11 @@ class Graph:
 
                 # Use the matched entity for prop arg
                 if arg.matched is not None:
-                    axiom = f'The {subject} is {prop.surf} a {arg.matched.core_pred.surf}'
+                    axiom = f'The {subject.surf} {copula} {prop.surf} a {arg.matched.core_pred.surf}'
 
                 # Use core pred itself if unmatched (these are unmatched subgoal via propositon)
                 else:
-                    axiom = f'The {subject} is {prop.surf} {arg.get_all_pred_str()}'
+                    axiom = f'The {subject.surf} {copula} {prop.surf} {arg.get_all_pred_str()}'
                 result.append(axiom)
                 self.checked_subgoals.append(prop.name)
         return result
@@ -214,13 +239,23 @@ class Graph:
             rel2 = rel2.lower()
 
             if node1.subj.subgoal:
-                subj = node1.subj.matched.core_pred.surf
+                subj = node1.subj.matched.core_pred
             else:
-                subj = node1.subj.core_pred.surf
+                subj = node1.subj.core_pred
 
             verb = node1.core_pred
-            target = getattr(node2, rel2).core_pred.surf
-            axiom = f'The {subj} is {progressive(verb).name} a {target}'
+            target = getattr(node2, rel2).core_pred
+            if subj.pos in {'NN', 'NNP'}:
+                copula = 'is'
+            else:
+                copula = 'are'
+
+            if target.pos in {'NN', 'NNP'}:
+                det = ' a '
+            else:
+                det = ' '
+
+            axiom = f'The {subj.surf} {copula} {progressive(verb).name}{det}{target.surf}'
             result.append(axiom)
             self.checked_subgoals.append(goal)
         return result
@@ -288,7 +323,7 @@ class Predicate():
     def __init__(self, i, name, pos, arg, subgoal, surf, graph):
         self.i = i
         self.name = name
-        self.surf = surf.lower()
+        self.surf = surf.lower().split('_')[0]
         self.pos = pos
         self.graph = graph
         self.subgoal = subgoal
@@ -464,52 +499,67 @@ class Event:
         if hasattr(self, 'acc'):
             if self.acc.subgoal:
                 if self.acc.matched is not None:
-                    acc = self.acc.matched.core_pred.surf
+                    acc = self.acc.matched.core_pred
                 # unmatched acc which only exists in conclusion
                 else:
-                    acc = self.acc.core_pred.surf
+                    acc = self.acc.core_pred
             else:
                 if self.acc.matched_by is not None:
-                    acc = self.acc.matched_by.core_pred.surf
+                    acc = self.acc.matched_by.core_pred
                 else:
-                    acc = self.acc.core_pred.surf
-            verb += f' a {acc}'
+                    acc = self.acc.core_pred
+
+            if acc.pos in {'NN', 'NNP'}:
+                verb += f' a {acc.surf}'
+            else:
+                verb += f' {acc.surf}'
 
         # if not check matched event in premise
         # self doesn't have acc but matched has? when does this occur
         elif hasattr(self.matched, 'acc'):
             breakpoint()
             if self.matched.acc.matched_by is not None:
-                acc = self.matched.acc.matched_by.core_pred.surf
+                acc = self.matched.acc.matched_by.core_pred
             else:
-                acc = self.matched.acc.core_pred.surf
-            verb += f' a {acc}'
+                acc = self.matched.acc.core_pred
+
+            if acc.pos in {'NN', 'NNP'}:
+                verb += f' a {acc.surf}'
+            else:
+                verb += f' {acc.surf}'
 
         if hasattr(self, 'dat'):
             if self.dat.subgoal:
 
                 if self.dat.matched is not None:
-                    dat = self.dat.matched.core_pred.surf
+                    dat = self.dat.matched.core_pred
 
                 # unmatched dat which only exists in conclusion
                 else:
-                    dat = self.dat.core_pred.surf
+                    dat = self.dat.core_pred
             else:
                 if self.dat.matched_by is not None and self.dat.matched_by.core_pred is not None:
-                    dat = self.dat.matched_by.core_pred.surf
+                    dat = self.dat.matched_by.core_pred
                 else:
-                    dat = self.dat.core_pred.surf
-            verb += f' to a {dat}'
+                    dat = self.dat.core_pred
+            if dat.pos in {'NN', 'NNP'}:
+                verb += f' to a {dat.surf}'
+            else:
+                verb += f' to {dat.surf}'
 
         # if not check matched event in premise
         # self doesn't have dat but matched has? when does this occur
         elif hasattr(self.matched, 'dat'):
             breakpoint()
             if self.matched.dat.matched_by is not None:
-                dat = self.matched.dat.matched_by.core_pred.surf
+                dat = self.matched.dat.matched_by.core_pred
             else:
-                dat = self.matched.dat.core_pred.surf
-            verb += f' to a {dat}'
+                dat = self.matched.dat.core_pred
+
+            if dat.pos in {'NN', 'NNP'}:
+                verb += f' to a {dat.surf}'
+            else:
+                verb += f' to {dat.surf}'
 
         return verb
 
@@ -519,7 +569,7 @@ class Event:
             if len(p.arg) == 1:
                 acc.append(p)
         result = ' '.join([p.name for p in acc])
-        if acc[-1].pos.startswith('NN'):
+        if acc[-1].pos in {'NN', 'NNP'}:
             result = f'a {result}'
         return result
 
@@ -542,6 +592,7 @@ def parse(x):
 
 def progressive(p):
     # TODO change this to spacy or nltk or something
+    p.name = p.name.split('_')[0]
     if p.name.endswith('ing'):
         return p
     if p.name.endswith('t'):
