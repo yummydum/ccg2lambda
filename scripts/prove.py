@@ -124,7 +124,7 @@ def prove(args):
                 fout.write('Axioms:\n')
                 for text in created_axioms:
                     fout.write(text + '\n')
-            breakpoint()
+
             with codecs.open('data/generated_axioms.csv', 'w',
                              'utf-8') as fout:
                 premise = ' '.join([x for x in theorem.theorems[0].pos.keys()])
