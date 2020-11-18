@@ -77,13 +77,14 @@ def main():
                     pred[i] = 0
             except KeyboardInterrupt:
                 sys.exit(1)
-            except:
+            except Exception as e:
                 errors += 1
                 print(f"Error! n={errors}")
+                print(e)
                 continue
         with codecs.open('data/stats.txt', 'w', 'utf-8') as fout:
             fout.write(str(pred))
-            ftou.write("\n")
+            fout.write("\n")
             fout.write(str(goal_num))
 
     else:
@@ -123,7 +124,7 @@ def prove(args):
                 fout.write('Axioms:\n')
                 for text in created_axioms:
                     fout.write(text + '\n')
-
+            breakpoint()
             with codecs.open('data/generated_axioms.csv', 'w',
                              'utf-8') as fout:
                 premise = ' '.join([x for x in theorem.theorems[0].pos.keys()])

@@ -92,14 +92,13 @@ def test_prove_40(monkeypatch):
     return
 
 
-# def test_prove_42(monkeypatch):
-#     monkeypatch.setattr('sys.argv', [
-#         'scripts/prove.py', 'data/parsed/pair_42.sem.xml', '--write',
-#         '--abduction', 'spsa'
-#     ])
-#     axioms, is_proved = main()
-#     breakpoint()
-#     return
+def test_prove_42(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_42.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms, is_proved = main()
+    return
 
 
 def test_prove_47(monkeypatch):
@@ -115,14 +114,14 @@ def test_prove_47(monkeypatch):
     return
 
 
-# def test_prove_100(monkeypatch):
-#     monkeypatch.setattr('sys.argv', [
-#         'scripts/prove.py', 'data/parsed/pair_100.sem.xml', '--write',
-#         '--abduction', 'spsa'
-#     ])
-#     axioms, is_proved = main()
-#     breakpoint()
-#     return
+def test_prove_100(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py', 'data/parsed/pair_100.sem.xml', '--write',
+        '--abduction', 'spsa'
+    ])
+    axioms, is_proved = main()
+    breakpoint()
+    return
 
 
 def test_prove_129(monkeypatch):

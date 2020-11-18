@@ -146,6 +146,7 @@ class Graph:
                     verb = progressive(pred).name
                     axiom = f'The {subject.surf} {copula} {e.get_pr(verb)}'
                 elif pred.pos.startswith('RB'):
+                    verb = progressive(e.core_pred)
                     axiom = f'The {subject.surf} {copula} {e.get_pr(verb)} {pred.surf}'
 
                 elif pred.pos in {'NN', 'NNS'}:
