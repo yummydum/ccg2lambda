@@ -64,7 +64,8 @@ def main():
         goal_num = {}
 
         errors = 0
-        for f in tqdm(sorted(list(args.sem.iterdir()))):
+        files = sorted([f for f in args.sem.iterdir()])
+        for f in tqdm(files):
             print(f)
             i = int(f.name.rstrip(".sem.xml").lstrip("pair_"))
             args.sem = f
@@ -117,7 +118,7 @@ def prove(args):
                 fout.write(hypothesis + '\n\n')
                 fout.write('Subgoals:\n')
                 for goal in theorem.theorems[0].subgoals:
-                    if goal.split(' ')[0] in theorem.theorems[0].neg_preds:
+                    if goal.split(' ')[0] in theorem.theorems[0].flipped:
                         goal += ' : False'
                     fout.write(goal + '\n')
                 fout.write('\n')

@@ -71,6 +71,10 @@ class Theorem(object):
         self.timeout = 100
         self.labels = []
         self.subgoals = []
+        self.created_axioms = {}
+        self.output_lines = []
+        self.flipped = []
+        self.result2 = None
 
     def __repr__(self):
         return self.coq_script
@@ -193,12 +197,21 @@ class Theorem(object):
         else:
             return 'unknown'
 
-    def prove_debug(self, axioms=None):
+    def prove_debug(self, axioms=None, flip_pred=False):
         failure_log = OrderedDict()
-        coq_script = make_coq_script(self.premises,
-                                     self.conclusion,
-                                     self.dynamic_library_str,
-                                     axioms=axioms)
+        if flip_pred:
+            coq_script, flipped = make_coq_script(self.premises,
+                                                  self.conclusion,
+                                                  self.dynamic_library_str,
+                                                  axioms=axioms,
+                                                  flip=True)
+            self.flipped = flipped
+
+        else:
+            coq_script = make_coq_script(self.premises,
+                                         self.conclusion,
+                                         self.dynamic_library_str,
+                                         axioms=axioms)
         current_tactics = get_tactics()
         debug_tactics = 'repeat nltac_base. try substitution. Qed'
         coq_script = coq_script.replace(current_tactics, debug_tactics)
@@ -206,6 +219,10 @@ class Theorem(object):
         self.output_lines = output_lines
 
         if is_theorem_defined(output_lines):
+
+            if axioms is None:
+                self.inference_result = True
+
             if axioms == self.axioms:
                 self.inference_result = True
                 self.coq_script = coq_script
@@ -217,40 +234,49 @@ class Theorem(object):
 
     def prove_simple(self):
         # from pudb import set_trace; set_trace()
-        self.coq_script, self.neg_preds = make_coq_script(
-            self.premises,
-            self.conclusion,
-            self.dynamic_library_str,
-            self.axioms,
-            neg_sub=True)
-        self.inference_result = prove_script(self.coq_script, self.timeout)
+        self.coq_script = make_coq_script(self.premises, self.conclusion,
+                                          self.dynamic_library_str,
+                                          self.axioms)
+        self.inference_result = prove_script(self)
         return
 
     def prove(self, abduction=None):
+
+        print('simple prove')
         self.prove_simple()
+        if self.inference_result:
+            self.result2 = 'entailment'
+            return
+
         self.variations.append(self)
+
+        # contradiction
         if self.inference_result is False:
             neg_theorem = self.negate()
+            print('P -> not H')
             neg_theorem.prove_simple()
             if neg_theorem.inference_result:
                 self.inference_result = True
+                self.result2 = 'contradiction'
+                return
 
-        if abduction and self.result == 'unknown' and self.doc is not None:
-            abduction.attempt(self)
+        # contradiction 2
+        print('neg VP flip')
+        self.prove_debug(flip_pred=True)
+        if self.inference_result:
+            self.result2 = 'contradiction'
+            return
 
-        # Reverse theorem
-        # rev_theorem = self.reverse()
-        # if rev_theorem is not None:
-        #     rev_theorem.prove_simple()
-        #     if rev_theorem.inference_result is False:
-        #         rev_neg_theorem = self.reverse(is_negated=True)
-        #         rev_neg_theorem.prove_simple()
+        if abduction and self.doc is not None:
+            print('abduction')
+            abduction_theorem = abduction.attempt(self)
+            if abduction_theorem.inference_result:
+                self.inference_result = True
+                self.result2 = 'entailment'
+                return
 
-        # Accumulate failure info
-        if not self.inference_result:
-            self.created_axioms = get_matched_premises(self)
-        else:
-            self.created_axioms = {}
+        print('readable subgoal')
+        self.created_axioms = get_matched_premises(self)
         return
 
     def get_subgoals(self, abduction=None):
@@ -399,16 +425,19 @@ def get_formulas_from_doc(doc):
     return formulas
 
 
-def make_coq_formulae(premise_interpretations, conclusion, reverse=False):
-    neg_tree = get_negated_subtree(conclusion)
-    if neg_tree:
-        neg_str = str(neg_tree[0])
-        pos_str = str(neg_tree[0].negate())
-        conclusion = str(conclusion).replace(neg_str, pos_str)
-        conclusion = Expression.fromstring(conclusion)
-        negated_preds = [str(x) for x in neg_tree[0].predicates()]
-    else:
-        negated_preds = []
+def make_coq_formulae(premise_interpretations,
+                      conclusion,
+                      reverse=False,
+                      flip=False):
+    flipped_preds = []
+    if flip:
+        neg_tree = get_negated_subtree(conclusion)
+        if neg_tree:
+            neg_str = str(neg_tree[0])
+            pos_str = str(neg_tree[0].negate())
+            conclusion = str(conclusion).replace(neg_str, pos_str)
+            conclusion = Expression.fromstring(conclusion)
+            flipped_preds = [str(x) for x in neg_tree[0].predicates()]
 
     interpretations = premise_interpretations + [conclusion]
     interpretations = [
@@ -417,18 +446,19 @@ def make_coq_formulae(premise_interpretations, conclusion, reverse=False):
     if reverse:
         interpretations.reverse()
     coq_formulae = ' -> '.join(interpretations)
-    return coq_formulae, negated_preds
+    return coq_formulae, flipped_preds
 
 
 def make_coq_script(premise_interpretations,
                     conclusion,
                     dynamic_library='',
                     axioms=None,
-                    neg_sub=False):
+                    flip=False):
     # Transform these interpretations into coq format:
     #   interpretation1 -> interpretation2 -> ... -> conclusion
     coq_formulae, neg_preds = make_coq_formulae(premise_interpretations,
-                                                conclusion)
+                                                conclusion,
+                                                flip=flip)
 
     # Input these formulae to coq and retrieve the results.
     tactics = get_tactics()
@@ -437,14 +467,14 @@ def make_coq_script(premise_interpretations,
     if axioms is not None and len(axioms) > 0:
         coq_script = insert_axioms_in_coq_script(axioms, coq_script)
     coq_script = substitute_invalid_chars(coq_script, 'replacement.txt')
-    if neg_sub:
+    if flip:
         return coq_script, neg_preds
     else:
         return coq_script
 
 
-def prove_script(coq_script, timeout=100):
-    output_lines = run_coq_script(coq_script, timeout)
+def prove_script(self):
+    output_lines = run_coq_script(self.coq_script, self.timeout)
     return is_theorem_defined(output_lines)
 
 
@@ -487,6 +517,8 @@ def negate_conclusion(conclusion):
 def is_theorem_defined(output_lines):
     for output_line in output_lines:
         if len(output_line) > 2 and 'No more subgoals.' in output_line:
+            return True
+        elif len(output_line) > 2 and 'No such goal.' in output_line:
             return True
     return False
 

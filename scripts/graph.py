@@ -66,7 +66,7 @@ class Graph:
         if i_e not in self.events:
             matched_e = self.events[i_e - 1000]
             self.addEvent(Event(i_e, subgoal=True))
-            self.entities[i_e].add_match(matched_e)
+            self.events[i_e].add_match(matched_e)
 
         event = self.events[i_e]
         entity = self.entities[i_x]

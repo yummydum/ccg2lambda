@@ -49,7 +49,6 @@ def find_final_conclusion_sep_line_index(coq_output_lines):
 
 
 def get_premise_lines(coq_output_lines):
-
     premise_lines = []
     line_index_last_conclusion_sep = find_final_conclusion_sep_line_index(
         coq_output_lines)
@@ -412,8 +411,6 @@ def make_graph(theorem, premises, subgoals):
 
 def get_matched_premises(theorem):
     output_lines = theorem.output_lines
-    if 'No more subgoals.' in output_lines:
-        return {}
     premise_lines = get_premise_lines(output_lines)
     conclusion = get_conclusion_line(output_lines)
     subgoals = get_subgoals_from_coq_output2(output_lines)

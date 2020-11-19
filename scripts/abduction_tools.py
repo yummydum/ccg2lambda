@@ -22,7 +22,10 @@ from theorem import insert_axioms_in_coq_script
 from theorem import is_theorem_error
 from theorem import run_coq_script
 
-def make_axioms_from_premises_and_conclusion(premises, conclusion, coq_output_lines=None):
+
+def make_axioms_from_premises_and_conclusion(premises,
+                                             conclusion,
+                                             coq_output_lines=None):
     matching_premises = get_premises_that_match_conclusion_args(
         premises, conclusion)
     premise_preds = [premise.split()[2] for premise in matching_premises]
@@ -31,8 +34,8 @@ def make_axioms_from_premises_and_conclusion(premises, conclusion, coq_output_li
     axioms = make_axioms_from_preds(premise_preds, conclusion_pred, pred_args)
     failure_log = OrderedDict()
     if not axioms:
-        failure_log = make_failure_log(
-            conclusion_pred, premise_preds, conclusion, premises, coq_output_lines)
+        failure_log = make_failure_log(conclusion_pred, premise_preds,
+                                       conclusion, premises, coq_output_lines)
     return axioms, failure_log
 
 
@@ -49,28 +52,32 @@ def make_axioms_from_preds(premise_preds, conclusion_pred, pred_args):
 
 
 def try_abductions(theorem):
-    assert len(theorem.variations) == 2, 'Got %d != 2 variations' % len(theorem.variations)
-    t_pos, t_neg = theorem.variations[:2] # theorem positive and negated.
+    assert len(theorem.variations) == 2, 'Got %d != 2 variations' % len(
+        theorem.variations)
+    t_pos, t_neg = theorem.variations[:2]  # theorem positive and negated.
     theorem_master = t_pos
 
     axioms = t_pos.axioms.union(t_neg.axioms)
     current_axioms = t_pos.axioms.union(t_neg.axioms)
     while True:
         # TODO: should be previous_axioms=axioms?
-        abduction_theorem = try_abduction(
-            t_pos, previous_axioms=current_axioms, expected='yes')
+        abduction_theorem = try_abduction(t_pos,
+                                          previous_axioms=current_axioms,
+                                          expected='yes')
         # TODO: should we add this adbuction_theorem in theorem_master.variations?
         current_axioms = axioms.union(abduction_theorem.axioms)
         # TODO: should it be abduction_theorem.result == 'unknown'?
         if theorem_master.result == 'unknown':
-            abduction_theorem = try_abduction(
-                t_neg, previous_axioms=current_axioms, expected='no')
+            abduction_theorem = try_abduction(t_neg,
+                                              previous_axioms=current_axioms,
+                                              expected='no')
             theorem_master.variations.append(abduction_theorem)
             current_axioms.update(abduction_theorem.axioms)
-        if len(axioms) == len(current_axioms) or theorem_master.result != 'unknown':
+        if len(axioms) == len(
+                current_axioms) or theorem_master.result != 'unknown':
             break
         axioms = {a for a in current_axioms}
-    return
+    return abduction_theorem
 
 
 def filter_wrong_axioms(axioms, coq_script):
@@ -93,10 +100,11 @@ def make_axioms_from_coq_analysis(failure_log):
         pred_args = get_predicate_arguments(
             subgoal.get('matching_raw_premises', []),
             subgoal.get('raw_subgoal', ''))
-        subgoal_axioms = make_axioms_from_preds(
-            premise_preds, conclusion_pred, pred_args)
+        subgoal_axioms = make_axioms_from_preds(premise_preds, conclusion_pred,
+                                                pred_args)
         axioms.update(subgoal_axioms)
     return axioms
+
 
 def try_abduction(theorem, previous_axioms=None, expected='yes'):
     if previous_axioms is None:
@@ -107,9 +115,8 @@ def try_abduction(theorem, previous_axioms=None, expected='yes'):
         return abduction_theorem
 
     axioms = make_axioms_from_coq_analysis(failure_log)
-    axioms = filter_wrong_axioms(axioms, theorem.coq_script)
+    # axioms = filter_wrong_axioms(axioms, theorem.coq_script)
     axioms = axioms.union(previous_axioms)
     abduction_theorem = theorem.copy(new_axioms=axioms)
     abduction_theorem.prove_simple()
     return abduction_theorem
-
