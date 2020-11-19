@@ -120,7 +120,7 @@ def test_prove_47(monkeypatch):
     axioms, is_proved = main()
     assert axioms[0] == 'The people are young'
     assert axioms[1] == 'The people are women'
-    assert axioms[2] == 'The people are sparing'
+    assert axioms[2] == 'The people are sparring'
     assert axioms[3] == 'The people are in a kickboxing fight'  # false
     return
 
@@ -204,8 +204,9 @@ def test_prove_150(monkeypatch):
 
 def test_prove_161(monkeypatch):
     monkeypatch.setattr('sys.argv', [
-        'scripts/prove.py', 'data/parsed/pair_161.sem.xml', '--write',
-        '--abduction', 'spsa'
+        'scripts/prove.py',
+        'data/parsed/pair_161.sem.xml',
+        '--write',
     ])
     axioms, is_proved = main()
     assert is_proved
@@ -214,8 +215,9 @@ def test_prove_161(monkeypatch):
 
 def test_prove_186(monkeypatch):
     monkeypatch.setattr('sys.argv', [
-        'scripts/prove.py', 'data/parsed/pair_186.sem.xml', '--write',
-        '--abduction', 'spsa'
+        'scripts/prove.py',
+        'data/parsed/pair_186.sem.xml',
+        '--write',
     ])
     axioms, is_proved = main()
     assert axioms[0] == 'The people are asian'
@@ -226,8 +228,9 @@ def test_prove_186(monkeypatch):
 
 def test_prove_254(monkeypatch):
     monkeypatch.setattr('sys.argv', [
-        'scripts/prove.py', 'data/parsed/pair_254.sem.xml', '--write',
-        '--abduction', 'spsa'
+        'scripts/prove.py',
+        'data/parsed/pair_254.sem.xml',
+        '--write',
     ])
     axioms, is_proved = main()
     assert is_proved
@@ -236,20 +239,22 @@ def test_prove_254(monkeypatch):
 
 def test_prove_1135(monkeypatch):
     monkeypatch.setattr('sys.argv', [
-        'scripts/prove.py', 'data/parsed/pair_1135.sem.xml', '--write',
-        '--abduction', 'spsa'
+        'scripts/prove.py',
+        'data/parsed/pair_1135.sem.xml',
+        '--write',
     ])
     axioms, is_proved = main()
     assert axioms[0] == 'The turtle is a sea'
-    assert axioms[1] == 'The turtle is huntting a fish'
+    assert axioms[1] == 'The turtle is hunting a fish'
     assert axioms[2] == 'The turtle is for a food'
     return
 
 
 def test_prove_1161(monkeypatch):
     monkeypatch.setattr('sys.argv', [
-        'scripts/prove.py', 'data/parsed/pair_1161.sem.xml', '--write',
-        '--abduction', 'spsa'
+        'scripts/prove.py',
+        'data/parsed/pair_1161.sem.xml',
+        '--write',
     ])
     axioms, is_proved = main()
     assert axioms[0] == 'The eggs are ingredients'
@@ -259,8 +264,9 @@ def test_prove_1161(monkeypatch):
 
 def test_prove_1000(monkeypatch):
     monkeypatch.setattr('sys.argv', [
-        'scripts/prove.py', 'data/parsed/pair_1000.sem.xml', '--write',
-        '--abduction', 'spsa'
+        'scripts/prove.py',
+        'data/parsed/pair_1000.sem.xml',
+        '--write',
     ])
     axioms, is_proved = main()
     assert axioms[0] == 'The boy is lowering a camera'
@@ -272,8 +278,9 @@ def test_prove_1000(monkeypatch):
 
 def test_prove_10000(monkeypatch):
     monkeypatch.setattr('sys.argv', [
-        'scripts/prove.py', 'data/parsed/pair_10000.sem.xml', '--write',
-        '--abduction', 'spsa'
+        'scripts/prove.py',
+        'data/parsed/pair_10000.sem.xml',
+        '--write',
     ])
     # No match at all!
     axioms, is_proved = main()
@@ -282,8 +289,9 @@ def test_prove_10000(monkeypatch):
 
 def test_prove_1010(monkeypatch):
     monkeypatch.setattr('sys.argv', [
-        'scripts/prove.py', 'data/parsed/pair_1010.sem.xml', '--write',
-        '--abduction', 'spsa'
+        'scripts/prove.py',
+        'data/parsed/pair_1010.sem.xml',
+        '--write',
     ])
     axioms, is_proved = main()
     assert axioms[0] == 'The jockeys is racing'
@@ -294,8 +302,9 @@ def test_prove_1010(monkeypatch):
 
 def test_prove_1016(monkeypatch):
     monkeypatch.setattr('sys.argv', [
-        'scripts/prove.py', 'data/parsed/pair_1016.sem.xml', '--write',
-        '--abduction', 'spsa'
+        'scripts/prove.py',
+        'data/parsed/pair_1016.sem.xml',
+        '--write',
     ])
     axioms, is_proved = main()
     assert axioms[0] == 'The grass is a field'
@@ -335,16 +344,13 @@ def test_prove_2350(monkeypatch):
     return
 
 
-def test_prove_975():
-    return
+# def test_prove_975():
+#     return
 
+# def test_prove_9760():
+#     return
 
-def test_prove_9760():
-    return
-
-
-def test_prove_9148():
-    return
-
+# def test_prove_9148():
+#     return
 
 # lexical contradiction is not handled now!

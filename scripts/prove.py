@@ -126,18 +126,22 @@ def prove(args):
                 for text in created_axioms:
                     fout.write(text + '\n')
 
-            with codecs.open('data/generated_axioms.csv', 'w',
-                             'utf-8') as fout:
-                premise = ' '.join([x for x in theorem.theorems[0].pos.keys()])
-                hypothesis = ' '.join(
-                    [x for x in theorem.theorems[0].pos2.keys()])
-                fout.write(args.sem.name + '\n')
-                fout.write(premise + '\n')
-                fout.write(hypothesis + '\n')
-                fout.write('Axioms:\n')
-                for text in created_axioms:
-                    fout.write(text + '\n')
-                fout.write('\n\n')
+            if created_axioms:
+                with codecs.open('data/generated_axioms_test.csv', 'a',
+                                 'utf-8') as fout:
+                    premise = ' '.join(
+                        [x for x in theorem.theorems[0].surf.values()])
+                    hypothesis = ' '.join(
+                        [x for x in theorem.theorems[0].surf2.values()])
+                    fout.write(args.sem.name + '\n')
+                    fout.write(premise + '\n')
+                    fout.write(hypothesis + '\n')
+                    fout.write('Axioms:\n')
+                    for text in created_axioms:
+                        fout.write(text + '\n')
+                    fout.write(
+                        '\n==================================================\n'
+                    )
 
     return created_axioms, False
 

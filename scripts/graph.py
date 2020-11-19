@@ -143,10 +143,10 @@ class Graph:
             for pred in e.predicates:
 
                 if pred.pos.startswith('V'):
-                    verb = progressive(pred).name
+                    verb = progressive(pred).surf
                     axiom = f'The {subject.surf} {copula} {e.get_pr(verb)}'
                 elif pred.pos.startswith('RB'):
-                    verb = progressive(e.core_pred)
+                    verb = progressive(e.core_pred).surf
                     axiom = f'The {subject.surf} {copula} {e.get_pr(verb)} {pred.surf}'
 
                 elif pred.pos in {'NN', 'NNS'}:
@@ -201,7 +201,7 @@ class Graph:
             # verb advb subgoal
             for pred in e.predicates:
                 if pred.pos.startswith('V'):
-                    verb = progressive(pred).name
+                    verb = progressive(pred).surf
                     axiom = f'The {subject.surf} {copula} {e.get_pr(verb)}'
                 elif pred.pos.startswith('RB'):
                     axiom = f'The {subject.surf} {copula} {e.get_pr(verb)} {pred.surf}'
