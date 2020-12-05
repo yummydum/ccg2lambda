@@ -70,6 +70,7 @@ class Theorem(object):
         self.failure_log = None
         self.timeout = 100
         self.labels = []
+        self.subgoal = []  # very bad naming...
         self.subgoals = []
         self.created_axioms = {}
         self.output_lines = []
@@ -104,17 +105,21 @@ class Theorem(object):
     def pos_from_doc(self, doc):
         self.pos = OrderedDict()
         self.surf = OrderedDict()
+        self.original = []
         tokens = doc.xpath('./sentences/sentence[1]/tokens')[0]
         for tok in tokens:
             self.pos[tok.attrib.get('base')] = tok.attrib.get('pos')
             self.surf[tok.attrib.get('base')] = tok.attrib.get('surf')
+            self.original.append(tok.attrib.get('surf'))
 
         tokens = doc.xpath('./sentences/sentence[2]/tokens')[0]
         self.pos2 = OrderedDict()
         self.surf2 = OrderedDict()
+        self.original2 = []
         for tok in tokens:
             self.pos2[tok.attrib.get('base')] = tok.attrib.get('pos')
             self.surf2[tok.attrib.get('base')] = tok.attrib.get('surf')
+            self.original2.append(tok.attrib.get('surf'))
         return
 
     def copy(self,
@@ -276,7 +281,7 @@ class Theorem(object):
                 return
 
         print('readable subgoal')
-        self.created_axioms = get_matched_premises(self)
+        get_matched_premises(self)
         return
 
     def get_subgoals(self, abduction=None):

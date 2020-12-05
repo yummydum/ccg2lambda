@@ -410,23 +410,27 @@ def make_graph(theorem, premises, subgoals):
 
 
 def get_matched_premises(theorem):
-    output_lines = theorem.output_lines
-    premise_lines = get_premise_lines(output_lines)
-    conclusion = get_conclusion_line(output_lines)
-    subgoals = get_subgoals_from_coq_output2(output_lines)
-    theorem.subgoals = subgoals
-    premises, subgoals, negation = preprocess(theorem, premise_lines,
-                                              conclusion, subgoals)
-    if len(subgoals) >= 10:
-        return {}
-    graph = make_graph(theorem, premises, subgoals)
-    # graph.visualize()
-    if not premise_lines:
-        raise ValueError('Type error')
-    elif not subgoals:  # proved?
-        # assert proved here
-        return {}
-    return graph.create_axioms()
+    try:
+        output_lines = theorem.output_lines
+        premise_lines = get_premise_lines(output_lines)
+        conclusion = get_conclusion_line(output_lines)
+        subgoals = get_subgoals_from_coq_output2(output_lines)
+        premises, subgoals, negation = preprocess(theorem, premise_lines,
+                                                  conclusion, subgoals)
+
+        # Skip too many subgoals
+        theorem.subgoal = subgoals
+        if len(subgoals) >= 10:
+            return {}
+
+        graph = make_graph(theorem, premises, subgoals)
+        # graph.visualize()
+        theorem.created_axioms = graph.create_axioms()
+        theorem.axiom_error = False
+    except:
+        theorem.create_axioms = {}
+        theorem.axiom_error = True
+    return
 
 
 def get_subgoals_from_coq_output2(coq_output_lines):
