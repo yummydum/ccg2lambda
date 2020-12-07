@@ -120,6 +120,7 @@ def test_prove_42(monkeypatch):
     return
 
 
+# contradiction by negation
 def test_prove_47(monkeypatch):
     monkeypatch.setattr('sys.argv', [
         'scripts/prove.py',
@@ -163,7 +164,6 @@ def test_prove_100(monkeypatch):
     ])
     theorem = main()
     axioms = theorem.created_axioms
-    breakpoint()
     return
 
 
@@ -258,16 +258,15 @@ def test_prove_254(monkeypatch):
     return
 
 
-def test_prove_751(monkeypatch):
+def test_prove_90(monkeypatch):
     monkeypatch.setattr('sys.argv', [
         'scripts/prove.py',
-        'data/parsed/pair_751.sem.xml',
+        'data/parsed/pair_90.sem.xml',
         '--write',
     ])
     theorem = main()
-    breakpoint()
     axioms = theorem.created_axioms
-    assert theorem.inference_result
+    assert axioms[0] == 'The pool is full'  # contradiction label
     return
 
 

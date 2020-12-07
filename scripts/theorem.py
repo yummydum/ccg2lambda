@@ -74,7 +74,6 @@ class Theorem(object):
         self.subgoals = []
         self.created_axioms = {}
         self.output_lines = []
-        self.flipped = []
         self.result2 = None
 
     def __repr__(self):
@@ -202,21 +201,12 @@ class Theorem(object):
         else:
             return 'unknown'
 
-    def prove_debug(self, axioms=None, flip_pred=False):
+    def prove_debug(self, axioms=None):
         failure_log = OrderedDict()
-        if flip_pred:
-            coq_script, flipped = make_coq_script(self.premises,
-                                                  self.conclusion,
-                                                  self.dynamic_library_str,
-                                                  axioms=axioms,
-                                                  flip=True)
-            self.flipped = flipped
-
-        else:
-            coq_script = make_coq_script(self.premises,
-                                         self.conclusion,
-                                         self.dynamic_library_str,
-                                         axioms=axioms)
+        coq_script = make_coq_script(self.premises,
+                                     self.conclusion,
+                                     self.dynamic_library_str,
+                                     axioms=axioms)
         current_tactics = get_tactics()
         debug_tactics = 'repeat nltac_base. try substitution. Qed'
         coq_script = coq_script.replace(current_tactics, debug_tactics)
@@ -238,7 +228,6 @@ class Theorem(object):
         return False, failure_log
 
     def prove_simple(self):
-        # from pudb import set_trace; set_trace()
         self.coq_script = make_coq_script(self.premises, self.conclusion,
                                           self.dynamic_library_str,
                                           self.axioms)
@@ -255,7 +244,7 @@ class Theorem(object):
 
         self.variations.append(self)
 
-        # contradiction
+        # contradiction (whole scope)
         if self.inference_result is False:
             neg_theorem = self.negate()
             print('P -> not H')
@@ -265,9 +254,12 @@ class Theorem(object):
                 self.result2 = 'contradiction'
                 return
 
-        # contradiction 2
+        # Delete negation from here
+        self.delete_negation_from_conclusion()
+
+        # contradiction 2 (narrow scope)
         print('neg VP flip')
-        self.prove_debug(flip_pred=True)
+        self.prove_simple()
         if self.inference_result:
             self.result2 = 'contradiction'
             return
@@ -279,9 +271,20 @@ class Theorem(object):
                 self.inference_result = True
                 self.result2 = 'entailment'
                 return
+        else:
+            self.prove_debug()
 
         print('readable subgoal')
         get_matched_premises(self)
+        return
+
+    def delete_negation_from_conclusion(self):
+        neg_tree = get_negated_subtree(self.conclusion)
+        if neg_tree:
+            neg_str = str(neg_tree[0])
+            pos_str = str(neg_tree[0].negate())
+            conclusion = str(self.conclusion).replace(neg_str, pos_str)
+            self.conclusion = Expression.fromstring(conclusion)
         return
 
     def get_subgoals(self, abduction=None):
@@ -297,6 +300,9 @@ class Theorem(object):
                 output_lines = run_coq_script(coq_script, self.timeout)
 
                 theorem.subgoals = get_subgoal_lines(output_lines)
+        return
+
+    def flip_premise():
         return
 
     def to_xml(self):
@@ -430,20 +436,7 @@ def get_formulas_from_doc(doc):
     return formulas
 
 
-def make_coq_formulae(premise_interpretations,
-                      conclusion,
-                      reverse=False,
-                      flip=False):
-    flipped_preds = []
-    if flip:
-        neg_tree = get_negated_subtree(conclusion)
-        if neg_tree:
-            neg_str = str(neg_tree[0])
-            pos_str = str(neg_tree[0].negate())
-            conclusion = str(conclusion).replace(neg_str, pos_str)
-            conclusion = Expression.fromstring(conclusion)
-            flipped_preds = [str(x) for x in neg_tree[0].predicates()]
-
+def make_coq_formulae(premise_interpretations, conclusion, reverse=False):
     interpretations = premise_interpretations + [conclusion]
     interpretations = [
         normalize_interpretation(interp) for interp in interpretations
@@ -451,19 +444,16 @@ def make_coq_formulae(premise_interpretations,
     if reverse:
         interpretations.reverse()
     coq_formulae = ' -> '.join(interpretations)
-    return coq_formulae, flipped_preds
+    return coq_formulae
 
 
 def make_coq_script(premise_interpretations,
                     conclusion,
                     dynamic_library='',
-                    axioms=None,
-                    flip=False):
+                    axioms=None):
     # Transform these interpretations into coq format:
     #   interpretation1 -> interpretation2 -> ... -> conclusion
-    coq_formulae, neg_preds = make_coq_formulae(premise_interpretations,
-                                                conclusion,
-                                                flip=flip)
+    coq_formulae = make_coq_formulae(premise_interpretations, conclusion)
 
     # Input these formulae to coq and retrieve the results.
     tactics = get_tactics()
@@ -472,14 +462,12 @@ def make_coq_script(premise_interpretations,
     if axioms is not None and len(axioms) > 0:
         coq_script = insert_axioms_in_coq_script(axioms, coq_script)
     coq_script = substitute_invalid_chars(coq_script, 'replacement.txt')
-    if flip:
-        return coq_script, neg_preds
-    else:
-        return coq_script
+    return coq_script
 
 
 def prove_script(self):
     output_lines = run_coq_script(self.coq_script, self.timeout)
+    self.output_lines = output_lines
     return is_theorem_defined(output_lines)
 
 

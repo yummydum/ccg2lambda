@@ -132,8 +132,6 @@ def prove(args):
             fout.write(hypothesis + '\n\n')
             fout.write('Subgoals:\n')
             for goal in theorem.theorems[0].subgoal:
-                if goal.split(' ')[0] in theorem.theorems[0].flipped:
-                    goal += ' : False'
                 fout.write(goal + '\n')
             fout.write('\n')
             fout.write('Axioms:\n')
@@ -169,15 +167,6 @@ def prove(args):
                     fout.write(text + '\n')
                 fout.write(
                     '\n==================================================\n')
-
-            with codecs.open(p2, 'a', 'utf-8') as fout:
-                fout.write(args.sem.name + '\n')
-                for goal in theorem.theorems[0].subgoal:
-                    if goal.split(' ')[0] in theorem.theorems[0].flipped:
-                        fout.write('0')
-                    else:
-                        fout.write('1')
-                fout.write('\n')
 
     return theorem.theorems[0]
 
