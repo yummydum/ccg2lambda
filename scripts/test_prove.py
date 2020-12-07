@@ -24,6 +24,7 @@ def test_prove_2(monkeypatch):
     theorem = main()
     axioms = theorem.created_axioms
     assert theorem.inference_result
+    assert theorem.result2 == 'contradiction'
     return
 
 
@@ -110,17 +111,19 @@ def test_prove_40(monkeypatch):
     return
 
 
+# CONTRADICTION by negation
 def test_prove_42(monkeypatch):
     monkeypatch.setattr('sys.argv', [
         'scripts/prove.py', 'data/parsed/pair_42.sem.xml', '--write',
         '--abduction', 'spsa'
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    assert theorem.inference_result
+    assert theorem.result2 == 'contradiction'
     return
 
 
-# contradiction by negation
+# negation removed NEUTRAL
 def test_prove_47(monkeypatch):
     monkeypatch.setattr('sys.argv', [
         'scripts/prove.py',
@@ -132,7 +135,7 @@ def test_prove_47(monkeypatch):
     assert axioms[0] == 'The people are young'
     assert axioms[1] == 'The people are women'
     assert axioms[2] == 'The people are sparring'
-    assert axioms[3] == 'The people are in a kickboxing fight'  # false
+    assert axioms[3] == 'The people are in a kickboxing fight'
     return
 
 
@@ -154,6 +157,18 @@ def test_prove_55(monkeypatch):
     theorem = main()
     axioms = theorem.created_axioms
     assert theorem.inference_result
+    return
+
+
+def test_prove_90(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py',
+        'data/parsed/pair_90.sem.xml',
+        '--write',
+    ])
+    theorem = main()
+    axioms = theorem.created_axioms
+    assert axioms[0] == 'The pool is full'  # contradiction label
     return
 
 
@@ -258,15 +273,17 @@ def test_prove_254(monkeypatch):
     return
 
 
-def test_prove_90(monkeypatch):
+# CONTRADICTION with subgoal
+def test_prove_276(monkeypatch):
     monkeypatch.setattr('sys.argv', [
         'scripts/prove.py',
-        'data/parsed/pair_90.sem.xml',
+        'data/parsed/pair_276.sem.xml',
         '--write',
     ])
     theorem = main()
     axioms = theorem.created_axioms
-    assert axioms[0] == 'The pool is full'  # contradiction label
+    assert axioms[0] == 'The boy is wading'
+    assert axioms[1] == 'The boy is through a ocean'
     return
 
 
