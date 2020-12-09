@@ -8,7 +8,7 @@ prove_test:
 	python scripts/prove.py data/parsed_test/pair_${n}.sem.xml  
 
 prove_all:
-	python scripts/prove.py data/parsed  --abduction spsa --sick_all --split train
+	python scripts/prove.py data/parsed --sick_all --split train
 
 prove_all_test:
 	python scripts/prove.py data/parsed_test  --sick_all --split test

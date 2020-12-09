@@ -370,6 +370,20 @@ def test_prove_1016(monkeypatch):
     return
 
 
+def test_prove_1212(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py',
+        'data/parsed/pair_1212.sem.xml',
+        '--write',
+    ])
+    theorem = main()
+    axioms = theorem.created_axioms
+    assert axioms[0] == 'There are two woman'
+    assert axioms[1] == 'The woman is boys'
+    assert axioms[2] == 'The device is a phone'
+    return
+
+
 def test_prove_232(monkeypatch):
     monkeypatch.setattr(
         'sys.argv',
@@ -380,6 +394,7 @@ def test_prove_232(monkeypatch):
     return
 
 
+# contradicion with subgoal
 def test_prove_2350(monkeypatch):
     monkeypatch.setattr('sys.argv', [
         'scripts/prove.py',
@@ -403,6 +418,28 @@ def test_prove_2350(monkeypatch):
     return
 
 
+def test_prove_2763(monkeypatch):
+    monkeypatch.setattr('sys.argv', [
+        'scripts/prove.py',
+        'data/parsed/pair_2350.sem.xml',
+        '--write',
+    ])
+    theorem = main()
+    axioms = theorem.created_axioms
+    assert axioms[0] == 'The lady is a woman'
+    assert axioms[
+        1] == 'The lady is removing a cheese to a sauce'  # wrong preposition for dative
+    assert axioms[2] == 'The lady is from a sauce'  # from がここに来ちゃうか
+
+
+# where did vidio go?
+# def test_prove_2634():
+#     return
+
+# why not provable?
+# def test_prove_1694():
+#     return
+
 # def test_prove_975():
 #     return
 
@@ -411,7 +448,5 @@ def test_prove_2350(monkeypatch):
 
 # def test_prove_9148():
 #     return
-
-# lexical contradiction is not handled now!
 
 # test split 2152,

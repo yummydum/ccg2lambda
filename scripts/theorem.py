@@ -74,7 +74,8 @@ class Theorem(object):
         self.subgoals = []
         self.created_axioms = {}
         self.output_lines = []
-        self.result2 = None
+        self.result2 = "neutral"
+        self.error_message = None
 
     def __repr__(self):
         return self.coq_script
@@ -275,7 +276,11 @@ class Theorem(object):
             self.prove_debug()
 
         print('readable subgoal')
-        get_matched_premises(self)
+        try:
+            get_matched_premises(self)
+        except Exception as err:
+            self.error_message = err
+            print(err)
         return
 
     def delete_negation_from_conclusion(self):

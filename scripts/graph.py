@@ -97,7 +97,7 @@ class Graph:
         e_list = [e for e in self.entities.values() if e.subgoal and e.matched]
         for e in e_list:
             for pred in e.predicates:
-
+                breakpoint()
                 subj = e.matched.core_pred
                 subgoal = pred.surf
 
@@ -114,7 +114,11 @@ class Graph:
                 else:
                     det = ' '
 
-                axiom = f'The {e.matched.core_pred.surf} {copula}{det}{subgoal}'
+                if pred.pos == "CD":
+                    axiom = f"There are {subgoal} {e.matched.core_pred.surf}"
+                else:
+                    axiom = f'The {e.matched.core_pred.surf} {copula}{det}{subgoal}'
+
                 result.append(axiom)
                 self.checked_subgoals.append(pred.surf)
         return result
