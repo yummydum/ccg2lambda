@@ -107,7 +107,8 @@ def prove(args):
     result["premise_formula"] = clean(theorem.premises[0])
     result["conclusion_formula"] = clean(theorem.conclusion)
     result["subgoals"] = theorem.subgoal
-    result["readable_subgoals"] = theorem.created_axioms
+    result["created_axioms"] = theorem.created_axioms
+    result["readable_subgoals"] = theorem.readable_subgoals
     result["prediction"] = theorem.result2
     fn = args.sem.name.replace("xml", "json")
     if args.abduction is None:

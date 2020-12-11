@@ -2,12 +2,13 @@ from graphviz import Digraph
 
 
 class Graph:
-    def __init__(self):
+    def __init__(self, var_map):
         self.entities = dict()
         self.events = dict()
         self.predicate = dict()
-        self.relation_subgoal = []
-        self.checked_subgoals = []
+        self.readable_subgoals = []
+        self.created_axioms = []
+        self.var_map = var_map
 
     def addPred(self, i, name, pos, arg, surf, subgoal):
         if name in self.predicate:
@@ -83,21 +84,18 @@ class Graph:
         self.events[e.i] = e
         return
 
-    def create_axioms(self):
-        result = []
-        result += self.from_matched_entities()
-        result += self.from_matched_events()
-        # result += self.from_unmatched_entities()  # assume this is handled by matched event (unmatched entity comes from new prop and new pred arg)
-        result += self.from_unmatched_events()
-        result += self.from_pr_subgoal()
-        return result
+    def create_readable_subgoals(self):
+        self.from_matched_entities()
+        self.from_matched_events()
+        # self.from_unmatched_entities()  # assume this is handled by matched event (unmatched entity comes from new prop and new pred arg)
+        self.from_unmatched_events()
+        # result += self.from_pr_subgoal()
+        return self.readable_subgoals, self.created_axioms
 
     def from_matched_entities(self):
-        result = []
         e_list = [e for e in self.entities.values() if e.subgoal and e.matched]
         for e in e_list:
             for pred in e.predicates:
-                breakpoint()
                 subj = e.matched.core_pred
                 subgoal = pred.surf
 
@@ -115,13 +113,14 @@ class Graph:
                     det = ' '
 
                 if pred.pos == "CD":
-                    axiom = f"There are {subgoal} {e.matched.core_pred.surf}"
+                    readable_sg = f"There are {subgoal} {e.matched.core_pred.surf}"
                 else:
-                    axiom = f'The {e.matched.core_pred.surf} {copula}{det}{subgoal}'
+                    readable_sg = f'The {e.matched.core_pred.surf} {copula}{det}{subgoal}'
+                axiom = f"Axiom {subgoal} : {pred.name}({e.matched.original_name})"
 
-                result.append(axiom)
-                self.checked_subgoals.append(pred.surf)
-        return result
+                self.readable_subgoals.append(readable_sg)
+                self.created_axioms.append(axiom)
+        return
 
     def from_unmatched_entities(self):
         result = []
@@ -133,7 +132,6 @@ class Graph:
         return result
 
     def from_matched_events(self):
-        result = []
         e_list = [e for e in self.events.values() if e.subgoal and e.matched]
         for e in e_list:
             subject = e.matched.subj.core_pred
@@ -145,24 +143,20 @@ class Graph:
 
             # verb advb subgoal
             for pred in e.predicates:
-
+                verb = progressive(pred).surf
                 if pred.pos.startswith('V'):
-                    verb = progressive(pred).surf
-                    axiom = f'The {subject.surf} {copula} {e.get_pr(verb)}'
+                    readable_sg = f'The {subject.surf} {copula} {e.get_pr(verb)}'
                 elif pred.pos.startswith('RB'):
-                    verb = progressive(e.core_pred).surf
-                    axiom = f'The {subject.surf} {copula} {e.get_pr(verb)} {pred.surf}'
-
+                    readable_sg = f'The {subject.surf} {copula} {e.get_pr(verb)} {pred.surf}'
                 elif pred.pos in {'NN', 'NNS'}:
-                    axiom = f'The {subject.surf} {copula} a {pred.surf}'
+                    readable_sg = f'The {subject.surf} {copula} a {pred.surf}'
                 elif pred.pos == {'NNP', 'NNPS'}:
-                    axiom = f'The {subject.surf} {copula} {pred.surf}'
-
+                    readable_sg = f'The {subject.surf} {copula} {pred.surf}'
                 else:
                     continue
-
-                result.append(axiom)
-                self.checked_subgoals.append(pred.name)
+                axiom = f"Axiom {verb} : {pred.name}({e.matched.original_name})"
+                self.readable_subgoals.append(readable_sg)
+                self.created_axioms.append(axiom)
 
             for prop in e.get_props():
                 for arg in prop.arg:
@@ -171,17 +165,16 @@ class Graph:
 
                 # Use the matched entity for prop arg
                 if arg.matched is not None:
-                    axiom = f'The {subject.surf} {copula} {prop.surf} a {arg.matched.core_pred.surf}'
+                    readable_sg = f'The {subject.surf} {copula} {prop.surf} a {arg.matched.core_pred.surf}'
                 # Use core pred itself if unmatched (these are unmatched subgoal via propositon)
                 else:
-                    axiom = f'The {subject.surf} {copula} {prop.surf} {arg.get_all_pred_str()}'
-                result.append(axiom)
-                self.checked_subgoals.append(prop.surf)
-        return result
+                    readable_sg = f'The {subject.surf} {copula} {prop.surf} {arg.get_all_pred_str()}'
+                axiom = f"Axiom {prop.name} : {prop.name}({e.matched.subj.original_name},{e.matched.original_name})"
+                self.readable_subgoals.append(readable_sg)
+        return
 
     def from_unmatched_events(self):
 
-        result = []
         e_list = [
             e for e in self.events.values() if e.subgoal and not e.matched
         ]
@@ -204,16 +197,18 @@ class Graph:
 
             # verb advb subgoal
             for pred in e.predicates:
+                verb = progressive(pred).surf
                 if pred.pos.startswith('V'):
-                    verb = progressive(pred).surf
-                    axiom = f'The {subject.surf} {copula} {e.get_pr(verb)}'
+                    readable_sg = f'The {subject.surf} {copula} {e.get_pr(verb)}'
+                    axiom = ""
                 elif pred.pos.startswith('RB'):
-                    axiom = f'The {subject.surf} {copula} {e.get_pr(verb)} {pred.surf}'
+                    readable_sg = f'The {subject.surf} {copula} {e.get_pr(verb)} {pred.surf}'
+                    axiom = f""
                 else:
                     continue
 
-                result.append(axiom)
-                self.checked_subgoals.append(pred.name)
+                self.readable_subgoals.append(readable_sg)
+                self.created_axioms.append(axiom)
 
             for prop in e.get_props():
                 for arg in prop.arg:
@@ -222,15 +217,17 @@ class Graph:
 
                 # Use the matched entity for prop arg
                 if arg.matched is not None:
-                    axiom = f'The {subject.surf} {copula} {prop.surf} a {arg.matched.core_pred.surf}'
+                    readable_sg = f'The {subject.surf} {copula} {prop.surf} a {arg.matched.core_pred.surf}'
+                    axiom = ""
 
                 # Use core pred itself if unmatched (these are unmatched subgoal via propositon)
                 else:
-                    axiom = f'The {subject.surf} {copula} {prop.surf} {arg.get_all_pred_str()}'
-                result.append(axiom)
-                self.checked_subgoals.append(prop.name)
-        return result
+                    readable_sg = f'The {subject.surf} {copula} {prop.surf} {arg.get_all_pred_str()}'
+                    axioms = ""
+                self.readable_subgoals.append(readable_sg)
+        return
 
+    # predicate relation subgoal
     def from_pr_subgoal(self):
         result = []
         for goal in self.relation_subgoal:
@@ -260,9 +257,8 @@ class Graph:
             else:
                 det = ' '
 
-            axiom = f'The {subj.surf} {copula} {progressive(verb).name}{det}{target.surf}'
-            result.append(axiom)
-            self.checked_subgoals.append(goal)
+            readable_sg = f'The {subj.surf} {copula} {progressive(verb).name}{det}{target.surf}'
+            result.append(readable_sg)
         return result
 
     def parseRel(self, name):
@@ -363,6 +359,10 @@ class Predicate():
                 arg = arg.lstrip('?').replace('z', 'x')
 
             t, i = parse(arg)
+            if arg in self.graph.var_map:
+                original_name = self.graph.var_map[arg]
+            else:
+                original_name = arg
 
             if t == 'e':
 
@@ -376,7 +376,7 @@ class Predicate():
                         i += 500
 
                 if i not in self.graph.events:
-                    self.graph.addEvent(Event(i, subgoal))
+                    self.graph.addEvent(Event(i, original_name, subgoal))
                 event = self.graph.events[i]
                 self._addEvent(event)
 
@@ -395,7 +395,7 @@ class Predicate():
                         i += 500
 
                 if i not in self.graph.entities:
-                    self.graph.addEntity(Entity(i, subgoal))
+                    self.graph.addEntity(Entity(i, original_name, subgoal))
                 entity = self.graph.entities[i]
                 self._addEntity(entity)
 
@@ -412,8 +412,9 @@ class Predicate():
 
 
 class Entity:
-    def __init__(self, i, subgoal=False):
+    def __init__(self, i, original_name, subgoal=False):
         self.i = int(i)
+        self.original_name = original_name
         self.predicates = []
         self.name = f'x{self.i}'
         self.subgoal = subgoal
@@ -461,8 +462,9 @@ class Entity:
 
 
 class Event:
-    def __init__(self, i, subgoal=False):
+    def __init__(self, i, original_name, subgoal=False):
         self.i = int(i)
+        self.original_name = original_name
         self.predicates = []
         self.name = f'e{self.i}'
         self.subgoal = subgoal

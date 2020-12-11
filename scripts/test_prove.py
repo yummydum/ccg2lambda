@@ -9,7 +9,7 @@ def test_prove_1(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The kids are boys'
     return
 
@@ -22,7 +22,7 @@ def test_prove_2(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert theorem.inference_result
     assert theorem.result2 == 'contradiction'
     return
@@ -36,7 +36,7 @@ def test_prove_3(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The boys are kids'
     assert axioms[1] == 'The man is with a smile_2'  # nice
     assert axioms[2] == 'The boys are near a man'  # nice
@@ -50,7 +50,7 @@ def test_prove_5(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The man is old'
     assert axioms[1] == 'The man is standing'
     assert axioms[2] == 'The man is in a background'
@@ -65,7 +65,7 @@ def test_prove_12(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The dogs are a hugging'  # wrong pos
     assert axioms[1] == 'The dogs are wrestling'
     return
@@ -78,7 +78,7 @@ def test_prove_26(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The bicycle is tricks'
     assert axioms[1] == 'The wheel is a motorbike'
     assert axioms[2] == 'The person is a man'
@@ -92,7 +92,7 @@ def test_prove_40(monkeypatch):
         'sys.argv',
         ['scripts/prove.py', 'data/parsed/pair_40.sem.xml', '--write'])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The basketball is a ball'  # composite word
     assert axioms[1] == 'The basketball is a game'
     assert axioms[2] == 'The player is a man'  # no
@@ -104,7 +104,7 @@ def test_prove_40(monkeypatch):
         '--abduction', 'spsa'
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The player is a man'
     assert axioms[1] == 'The player is with a jersey'  # good example
     assert axioms[2] == 'The player is at a basketball'  # good example
@@ -131,7 +131,7 @@ def test_prove_47(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The people are young'
     assert axioms[1] == 'The people are women'
     assert axioms[2] == 'The people are sparring'
@@ -147,7 +147,7 @@ def test_prove_55(monkeypatch):
         'sys.argv',
         ['scripts/prove.py', 'data/parsed/pair_55.sem.xml', '--write'])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert not theorem.inference_result
 
     monkeypatch.setattr('sys.argv', [
@@ -155,7 +155,7 @@ def test_prove_55(monkeypatch):
         '--abduction', 'spsa'
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert theorem.inference_result
     return
 
@@ -167,7 +167,7 @@ def test_prove_90(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The pool is full'  # contradiction label
     return
 
@@ -178,7 +178,7 @@ def test_prove_100(monkeypatch):
         '--abduction', 'spsa'
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     return
 
 
@@ -188,7 +188,7 @@ def test_prove_122(monkeypatch):
         '--abduction', 'spsa'
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The kid is a none'  # wrong
     return
 
@@ -199,7 +199,7 @@ def test_prove_129(monkeypatch):
         '--abduction', 'spsa'
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert theorem.inference_result
     return
 
@@ -210,7 +210,7 @@ def test_prove_140(monkeypatch):
         '--abduction', 'spsa'
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert theorem.inference_result
     return
 
@@ -220,7 +220,7 @@ def test_prove_141(monkeypatch):
         'sys.argv',
         ['scripts/prove.py', 'data/parsed/pair_141.sem.xml', '--write'])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert theorem.inference_result
     return
 
@@ -230,7 +230,7 @@ def test_prove_150(monkeypatch):
         'sys.argv',
         ['scripts/prove.py', 'data/parsed/pair_141.sem.xml', '--write'])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert theorem.inference_result
     return
 
@@ -242,7 +242,7 @@ def test_prove_161(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert theorem.inference_result
     return
 
@@ -254,7 +254,7 @@ def test_prove_186(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The people are asian'
     assert axioms[1] == 'The people are large'
     assert axioms[2] == 'The people are at a tables'
@@ -268,7 +268,7 @@ def test_prove_254(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert theorem.inference_result
     return
 
@@ -281,7 +281,7 @@ def test_prove_276(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The boy is wading'
     assert axioms[1] == 'The boy is through a ocean'
     return
@@ -294,7 +294,7 @@ def test_prove_1135(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The turtle is a sea'
     assert axioms[1] == 'The turtle is hunting a fish'
     assert axioms[2] == 'The turtle is for a food'
@@ -308,7 +308,7 @@ def test_prove_1161(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The eggs are ingredients'
     assert axioms[1] == 'The woman is adding ingredients to a bowl'
     return
@@ -321,7 +321,7 @@ def test_prove_1000(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The boy is lowering a camera'
     assert axioms[1] == 'The boy is facing a camera'
     assert axioms[
@@ -337,7 +337,7 @@ def test_prove_10000(monkeypatch):
     ])
     # No match at all!
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     return
 
 
@@ -348,7 +348,7 @@ def test_prove_1010(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The jockeys is racing'
     assert axioms[1] == 'The jockeys is on a field'
     assert axioms[2] == 'The jockeys is racing a field'
@@ -362,7 +362,7 @@ def test_prove_1016(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The grass is a field'
     assert axioms[1] == 'The racers are jockeys'
     assert axioms[2] == 'The racers are racing'
@@ -377,7 +377,7 @@ def test_prove_1212(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'There are two woman'
     assert axioms[1] == 'The woman is boys'
     assert axioms[2] == 'The device is a phone'
@@ -389,7 +389,7 @@ def test_prove_232(monkeypatch):
         'sys.argv',
         ['scripts/prove.py', 'data/parsed/pair_232.sem.xml', '--write'])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert theorem.inference_result
     return
 
@@ -402,7 +402,7 @@ def test_prove_2350(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The lady is a woman'
     assert axioms[1] == 'The lady is removing a cheese to a sauce'
     assert axioms[2] == 'The lady is from a sauce'
@@ -412,7 +412,7 @@ def test_prove_2350(monkeypatch):
         '--abduction', 'spsa'
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The lady is removing a cheese to a sauce'
     assert axioms[1] == 'The lady is from a sauce'
     return
@@ -425,7 +425,7 @@ def test_prove_2763(monkeypatch):
         '--write',
     ])
     theorem = main()
-    axioms = theorem.created_axioms
+    axioms = theorem.readable_subgoals
     assert axioms[0] == 'The lady is a woman'
     assert axioms[
         1] == 'The lady is removing a cheese to a sauce'  # wrong preposition for dative
@@ -433,10 +433,12 @@ def test_prove_2763(monkeypatch):
 
 
 # where did vidio go?
+# -> composite noun case...
 # def test_prove_2634():
 #     return
 
 # why not provable?
+# CCG tag diffrent... however may be possible to solve via axiom injection
 # def test_prove_1694():
 #     return
 

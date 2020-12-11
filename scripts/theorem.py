@@ -72,7 +72,8 @@ class Theorem(object):
         self.labels = []
         self.subgoal = []  # very bad naming...
         self.subgoals = []
-        self.created_axioms = {}
+        self.created_axioms = []
+        self.readable_subgoals = []
         self.output_lines = []
         self.result2 = "neutral"
         self.error_message = None
@@ -255,16 +256,6 @@ class Theorem(object):
                 self.result2 = 'contradiction'
                 return
 
-        # Delete negation from here
-        self.delete_negation_from_conclusion()
-
-        # contradiction 2 (narrow scope)
-        print('neg VP flip')
-        self.prove_simple()
-        if self.inference_result:
-            self.result2 = 'contradiction'
-            return
-
         if abduction and self.doc is not None:
             print('abduction')
             abduction_theorem = abduction.attempt(self)
@@ -278,6 +269,7 @@ class Theorem(object):
         print('readable subgoal')
         try:
             get_matched_premises(self)
+            self.prove_debug(axioms=self.created_axioms)
         except Exception as err:
             self.error_message = err
             print(err)
