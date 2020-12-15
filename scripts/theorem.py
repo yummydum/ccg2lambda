@@ -23,13 +23,14 @@ from lxml import etree
 import subprocess
 import re
 
-from coq_analyzer import analyze_coq_output, get_matched_premises
+from coq_analyzer import analyze_coq_output, get_premise_lines, get_subgoals_from_coq_output2, get_conclusion_line
 from nltk2coq import normalize_interpretation
 from semantic_types import get_dynamic_library_from_doc
 from tactics import get_tactics
 from normalization import substitute_invalid_chars
 from nltk2normal import rename_variable, convert_to_prenex, remove_true, get_negated_subtree
 from nltk.sem.logic import Expression
+from graph import Graph
 
 
 def normalize(x):
@@ -102,26 +103,6 @@ class Theorem(object):
         theorem = Theorem(premises, conclusion, set(), dynamic_library_str)
         theorem.doc = doc
         return theorem
-
-    def pos_from_doc(self, doc):
-        self.pos = OrderedDict()
-        self.surf = OrderedDict()
-        self.original = []
-        tokens = doc.xpath('./sentences/sentence[1]/tokens')[0]
-        for tok in tokens:
-            self.pos[tok.attrib.get('base')] = tok.attrib.get('pos')
-            self.surf[tok.attrib.get('base')] = tok.attrib.get('surf')
-            self.original.append(tok.attrib.get('surf'))
-
-        tokens = doc.xpath('./sentences/sentence[2]/tokens')[0]
-        self.pos2 = OrderedDict()
-        self.surf2 = OrderedDict()
-        self.original2 = []
-        for tok in tokens:
-            self.pos2[tok.attrib.get('base')] = tok.attrib.get('pos')
-            self.surf2[tok.attrib.get('base')] = tok.attrib.get('surf')
-            self.original2.append(tok.attrib.get('surf'))
-        return
 
     def copy(self,
              new_premises=None,
@@ -203,12 +184,17 @@ class Theorem(object):
         else:
             return 'unknown'
 
-    def prove_debug(self, axioms=None):
+    def prove_debug(self, axioms=None, use_noneg=False):
         failure_log = OrderedDict()
+        if use_noneg:
+            conclusion = self.conclusion_noneg
+        else:
+            conclusion = self.conclusion
         coq_script = make_coq_script(self.premises,
-                                     self.conclusion,
+                                     conclusion,
                                      self.dynamic_library_str,
                                      axioms=axioms)
+
         current_tactics = get_tactics()
         debug_tactics = 'repeat nltac_base. try substitution. Qed'
         coq_script = coq_script.replace(current_tactics, debug_tactics)
@@ -263,25 +249,42 @@ class Theorem(object):
                 self.inference_result = True
                 self.result2 = 'entailment'
                 return
-        else:
-            self.prove_debug()
 
         print('readable subgoal')
-        try:
-            get_matched_premises(self)
-            self.prove_debug(axioms=self.created_axioms)
-        except Exception as err:
-            self.error_message = err
-            print(err)
+        self.create_noneg_conclusion()
+        self.prove_debug(use_noneg=True)
+        self.create_readable_subgoals()
+        self.prove_debug(axioms=self.created_axioms)
         return
 
-    def delete_negation_from_conclusion(self):
+    def create_readable_subgoals(self):
+        g = Graph(self)
+
+        output_lines = self.output_lines
+        premise_line = get_premise_lines(output_lines)
+        g.addPremise(premise_line)
+
+        subgoal_line = get_subgoals_from_coq_output2(output_lines)
+        subgoal_line.append(get_conclusion_line(output_lines))
+        g.addSubgoals(subgoal_line)
+
+        # graph.visualize()
+        readable_subgoals, created_axioms = g.create_readable_subgoals()
+        self.readable_subgoals = readable_subgoals
+        self.created_axioms = created_axioms
+        self.premise_sentence = " ".join(g.premise)
+        self.hypothesis_sentence = " ".join(g.hypothesis)
+        return
+
+    def create_noneg_conclusion(self):
         neg_tree = get_negated_subtree(self.conclusion)
         if neg_tree:
             neg_str = str(neg_tree[0])
             pos_str = str(neg_tree[0].negate())
             conclusion = str(self.conclusion).replace(neg_str, pos_str)
-            self.conclusion = Expression.fromstring(conclusion)
+            self.conclusion_noneg = Expression.fromstring(conclusion)
+        else:
+            self.conclusion_noneg = self.conclusion
         return
 
     def get_subgoals(self, abduction=None):
@@ -581,7 +584,6 @@ class MasterTheorem(Theorem):
                 doc, semantics)
             premises, conclusion = formulas[:-1], formulas[-1]
             theorem = Theorem(premises, conclusion, set(), dynamic_library_str)
-            theorem.pos_from_doc(doc)
             labels = [(s.get('ccg_id', None), s.get('ccg_parser', None))
                       for s in semantics]
             theorem.labels = labels

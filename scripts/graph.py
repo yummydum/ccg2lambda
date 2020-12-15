@@ -1,278 +1,270 @@
+import logging
 from graphviz import Digraph
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 class Graph:
-    def __init__(self, var_map):
+    def __init__(self, theorem):
+        self.theorem = theorem
+        self.premise = []
+        self.hypothesis = []
         self.entities = dict()
         self.events = dict()
-        self.predicate = dict()
-        self.readable_subgoals = []
-        self.created_axioms = []
-        self.var_map = var_map
-
-    def addPred(self, i, name, pos, arg, surf, subgoal):
-        if name in self.predicate:
-            name = f'{name}_2'  # fix this
-        pred = Predicate(i, name, pos, arg, subgoal, surf, self)
-        self.predicate[pred.name] = pred
+        self.unmatched_entities = dict()
+        self.unmatched_events = dict()
+        self.prem_pred = dict()
+        self.subgoal_pred = []
         return
 
-    def addRelation(self, event, entity, name):
-
-        t_e, i_e = parse(event)
-        t_x, i_x = parse(entity)
-
-        event = self.events[i_e]
-        entity = self.entities[i_x]
-        self.events[event.i].addRelation(entity, name)
-
-        # Assuming event and matched event share same predicate argument, copy the argument relation to the subgoal specific event
-        if event.matched_by is not None:
-            self.events[event.matched_by.i].addRelation(entity, name)
-        return
-
-    def addSubgoalRelation(self, event, entity, name):
-        if event.startswith('?'):
-            event = event.lstrip('?')
-            e_matched = False
+    def addEntity(self, name, is_unified=True):
+        assert name not in self.entities
+        if is_unified:
+            self.entities[name] = Entity(name)
         else:
-            e_matched = True
-
-        if entity.startswith('?'):
-            entity = entity.lstrip('?')
-            x_matched = False
-        else:
-            x_matched = True
-
-        t_e, i_e = parse(event)
-        t_x, i_x = parse(entity)
-
-        assert t_e == 'e'
-        assert t_x == 'x'
-
-        if x_matched:
-            i_x += 1000
-        else:
-            i_x += 500
-        if e_matched:
-            i_e += 1000
-        else:
-            i_e += 500
-
-        if i_x not in self.entities:
-            matched_x = self.entities[i_x - 1000]
-            self.addEntity(Entity(i_x, subgoal=True))
-            self.entities[i_x].add_match(matched_x)
-
-        if i_e not in self.events:
-            matched_e = self.events[i_e - 1000]
-            self.addEvent(Event(i_e, subgoal=True))
-            self.events[i_e].add_match(matched_e)
-
-        event = self.events[i_e]
-        entity = self.entities[i_x]
-        self.events[event.i].addRelation(entity, name)
+            self.unmatched_entities[name] = Entity(name)
         return
 
-    def addEntity(self, e):
-        assert isinstance(e, Entity) and e.i not in self.entities
-        self.entities[e.i] = e
+    def addEvent(self, name, is_unified=True):
+        assert name not in self.events
+        if is_unified:
+            self.events[name] = Event(name)
+        else:
+            self.unmatched_events[name] = Event(name)
         return
 
-    def addEvent(self, e):
-        assert isinstance(e, Event) and e.i not in self.events
-        self.events[e.i] = e
+    def getEntity(self, name, is_unified=True):
+        if is_unified:
+            return self.entities[name]
+        else:
+            return self.unmatched_entities[name]
+
+    def getEvent(self, name, is_unified=True):
+        if is_unified:
+            return self.events[name]
+        else:
+            return self.unmatched_events[name]
+
+    def getE(self, name, is_unified=True):
+        if is_unified:
+            if name in self.entities:
+                return self.entities[name]
+            elif name in self.events:
+                return self.events[name]
+            else:
+                raise ValueError(f"{name} is not found in the graph")
+        else:
+            if name in self.unmatched_entities:
+                return self.unmatched_entities[name]
+            elif name in self.unmatched_events:
+                return self.unmatched_events[name]
+            else:
+                raise ValueError(f"{name} is not found in the graph")
+
+    def setSemanticRole(self, entity_name):
+        relation, event_name = entity_name.split(" ")
+        relation = relation.lower()
+        event = self.getEvent(event_name)
+        assert not hasattr(event, relation)
+        entity = self.getEntity(entity_name)
+        setattr(event, relation, entity)
         return
+
+    def addEs(self, type_lines):
+        for line in type_lines:
+            var, typ = line.split(" : ")
+            if typ == "Entity":
+                self.addEntity(var)
+            elif typ == "Event":
+                self.addEvent(var)
+            else:
+                raise ValueError("Type should be Entity or Event")
+
+    def addPremise(self, premise_lines):
+        logging.debug(premise_lines)
+        type_lines, pred_lines = seperate_lines(premise_lines)
+        self.addEs(type_lines)
+
+        # pos surf info
+        tokens = self.theorem.doc.xpath('./sentences/sentence[1]/tokens')[0]
+        d = dict()
+        for tok in tokens:
+            base, pos, surf = get_attrs(tok)
+            d[base] = pos, surf
+            self.premise.append(surf)
+
+        # add preds
+        for line in pred_lines:
+
+            H, body = line.split(" : ")
+            pred_name = clean_pred_name(body)
+            args = body.split()[1:]
+
+            # process semantic role
+            args = handleSemanticRoleArgs(args)
+            args2 = []
+            for a in args:
+                if isSemanticRole(a) and a not in self.entities:
+                    self.addEntity(a)
+                    self.setSemanticRole(a)
+                args2.append(self.getE(a))
+
+            pos, surf = d[pred_name]
+            self.prem_pred[pred_name] = Predicate(pred_name, args2, pos, surf)
+        return
+
+    def addSubgoals(self, subgoal_line):
+        logging.debug(subgoal_line)
+        tokens = self.theorem.doc.xpath('./sentences/sentence[2]/tokens')[0]
+        d = dict()
+        for tok in tokens:
+            base, pos, surf = get_attrs(tok)
+            d[base] = pos, surf
+            self.hypothesis.append(base)
+
+        for goal in subgoal_line:
+            if "=" not in goal:
+                pred_name = goal.split()[0]
+                pred_name = clean_pred_name(pred_name)
+                args = goal.split()[1:]
+                if len(args) == 0:
+                    breakpoint()
+                args = handleSemanticRoleArgs(args)
+                args = self.handleUnunifiedE(args)
+                pos, surf = d[pred_name]
+                p = Predicate(pred_name, args, pos, surf)
+                self.subgoal_pred.append(p)
+            else:
+                print("TODO: = in goal")
+                breakpoint()
+        return
+
+    def handleUnunifiedE(self, args):
+        result = []
+        for a in args:
+            if a.startswith("?x") or a.startswith("?y") or a.startswith("?z"):
+                if a not in self.unmatched_entities:
+                    self.addEntity(a, is_unified=False)
+                result.append(self.getEntity(a, is_unified=False))
+            elif a.startswith("?e"):
+                if a not in self.unmatched_events:
+                    self.addEvent(a, is_unified=False)
+                result.append(self.getEvent(a, is_unified=False))
+            else:
+                result.append(self.getE(a))
+        return result
 
     def create_readable_subgoals(self):
-        self.from_matched_entities()
-        self.from_matched_events()
-        # self.from_unmatched_entities()  # assume this is handled by matched event (unmatched entity comes from new prop and new pred arg)
-        self.from_unmatched_events()
-        # result += self.from_pr_subgoal()
-        return self.readable_subgoals, self.created_axioms
-
-    def from_matched_entities(self):
-        e_list = [e for e in self.entities.values() if e.subgoal and e.matched]
-        for e in e_list:
-            for pred in e.predicates:
-                subj = e.matched.core_pred
-                subgoal = pred.surf
-
-                if pred.pos == 'IN':
+        readable_subgoals = []
+        created_axioms = []
+        for pred in self.subgoal_pred:
+            if pred.is_unified():
+                if pred.is_ox():
+                    readable_sg, axiom = self.from_ox(pred)
+                elif pred.is_oe():
+                    readable_sg, axiom = self.from_oe(pred)
+                else:
+                    assert pred.is_tp()
+                    readable_sg, axiom = self.from_tp(pred)
+            else:
+                if pred.is_tp():
+                    readable_sg, axiom = self.from_tp_ununified(pred)
+                else:
                     continue
+            readable_subgoals.append(readable_sg)
+            created_axioms.append(axiom)
+            logging.debug((readable_sg, axiom))
+        return readable_subgoals, created_axioms
 
-                if subj.pos in {'NN', 'NNP'}:
-                    copula = 'is'
-                else:
-                    copula = 'are'
+    def from_ox(self, subgoal):
+        logging.debug(
+            f"readable subgoal from one place entity pred: {subgoal.name}")
+        e = subgoal.args[0]
+        subj = e.getNoun()
 
-                if pred.pos in {'NN', 'NNP'}:
-                    det = f' a '
-                else:
-                    det = ' '
-
-                if pred.pos == "CD":
-                    readable_sg = f"There are {subgoal} {e.matched.core_pred.surf}"
-                else:
-                    readable_sg = f'The {e.matched.core_pred.surf} {copula}{det}{subgoal}'
-                axiom = f"Axiom {subgoal} : {pred.name}({e.matched.original_name})"
-
-                self.readable_subgoals.append(readable_sg)
-                self.created_axioms.append(axiom)
-        return
-
-    def from_unmatched_entities(self):
-        result = []
-        e_list = [
-            e for e in self.entities.values() if e.subgoal and not e.matched
-        ]
-        if len(e_list) > 0:
+        if subgoal.pos == 'IN':
+            print("One place IN taking x??")
             breakpoint()
-        return result
 
-    def from_matched_events(self):
-        e_list = [e for e in self.events.values() if e.subgoal and e.matched]
-        for e in e_list:
-            subject = e.matched.subj.core_pred
+        copula = selectCopula(subj)
+        det = selectDeterminer(subgoal)
 
-            if subject.pos in {'NNS', 'NNPS'}:
-                copula = 'are'
-            else:
-                copula = 'is'
-
-            # verb advb subgoal
-            for pred in e.predicates:
-                verb = progressive(pred).surf
-                if pred.pos.startswith('V'):
-                    readable_sg = f'The {subject.surf} {copula} {e.get_pr(verb)}'
-                elif pred.pos.startswith('RB'):
-                    readable_sg = f'The {subject.surf} {copula} {e.get_pr(verb)} {pred.surf}'
-                elif pred.pos in {'NN', 'NNS'}:
-                    readable_sg = f'The {subject.surf} {copula} a {pred.surf}'
-                elif pred.pos == {'NNP', 'NNPS'}:
-                    readable_sg = f'The {subject.surf} {copula} {pred.surf}'
-                else:
-                    continue
-                axiom = f"Axiom {verb} : {pred.name}({e.matched.original_name})"
-                self.readable_subgoals.append(readable_sg)
-                self.created_axioms.append(axiom)
-
-            for prop in e.get_props():
-                for arg in prop.arg:
-                    if arg != e:
-                        break
-
-                # Use the matched entity for prop arg
-                if arg.matched is not None:
-                    readable_sg = f'The {subject.surf} {copula} {prop.surf} a {arg.matched.core_pred.surf}'
-                # Use core pred itself if unmatched (these are unmatched subgoal via propositon)
-                else:
-                    readable_sg = f'The {subject.surf} {copula} {prop.surf} {arg.get_all_pred_str()}'
-                axiom = f"Axiom {prop.name} : {prop.name}({e.matched.subj.original_name},{e.matched.original_name})"
-                self.readable_subgoals.append(readable_sg)
-        return
-
-    def from_unmatched_events(self):
-
-        e_list = [
-            e for e in self.events.values() if e.subgoal and not e.matched
-        ]
-        for e in e_list:
-
-            # e? introduced by prop
-            if not hasattr(e, 'subj'):
-                continue
-            # subj is unmatched (completely different sentence?)
-            elif e.subj.matched is None:
-                continue
-
-            subject = e.subj.matched.core_pred
-            if subject.pos in {'NN', 'NNP'}:
-                copula = 'is'
-            elif subject.pos in {'NNS', 'NNPS'}:
-                copula = 'are'
-            else:
-                copula = 'is'
-
-            # verb advb subgoal
-            for pred in e.predicates:
-                verb = progressive(pred).surf
-                if pred.pos.startswith('V'):
-                    readable_sg = f'The {subject.surf} {copula} {e.get_pr(verb)}'
-                    axiom = ""
-                elif pred.pos.startswith('RB'):
-                    readable_sg = f'The {subject.surf} {copula} {e.get_pr(verb)} {pred.surf}'
-                    axiom = f""
-                else:
-                    continue
-
-                self.readable_subgoals.append(readable_sg)
-                self.created_axioms.append(axiom)
-
-            for prop in e.get_props():
-                for arg in prop.arg:
-                    if arg != e:
-                        break
-
-                # Use the matched entity for prop arg
-                if arg.matched is not None:
-                    readable_sg = f'The {subject.surf} {copula} {prop.surf} a {arg.matched.core_pred.surf}'
-                    axiom = ""
-
-                # Use core pred itself if unmatched (these are unmatched subgoal via propositon)
-                else:
-                    readable_sg = f'The {subject.surf} {copula} {prop.surf} {arg.get_all_pred_str()}'
-                    axioms = ""
-                self.readable_subgoals.append(readable_sg)
-        return
-
-    # predicate relation subgoal
-    def from_pr_subgoal(self):
-        result = []
-        for goal in self.relation_subgoal:
-            first, second = goal
-            rel, name = first[0], first[1]
-            node1 = self.parseRel(name)
-            rel2, name2 = second[0], second[1]
-            node2 = self.parseRel(name2)
-
-            rel = rel.lower()
-            rel2 = rel2.lower()
-
-            if node1.subj.subgoal:
-                subj = node1.subj.matched.core_pred
-            else:
-                subj = node1.subj.core_pred
-
-            verb = node1.core_pred
-            target = getattr(node2, rel2).core_pred
-            if subj.pos in {'NN', 'NNP'}:
-                copula = 'is'
-            else:
-                copula = 'are'
-
-            if target.pos in {'NN', 'NNP'}:
-                det = ' a '
-            else:
-                det = ' '
-
-            readable_sg = f'The {subj.surf} {copula} {progressive(verb).name}{det}{target.surf}'
-            result.append(readable_sg)
-        return result
-
-    def parseRel(self, name):
-        unmatched = name.startswith('?')
-        if unmatched:
-            name = name.lstrip('?')
-        t, i = parse(name)
-
-        if unmatched:
-            i += 500
-        if t == 'x':
-            return self.entities[i]
+        if subgoal.pos == "CD":
+            readable_sg = f"There are {subgoal.surf} {subj.surf}"
         else:
-            return self.events[i]
+            readable_sg = f'The {subj.surf} {copula}{det}{subgoal.surf}'
+        axiom = f"Axiom {subgoal.surf} : {subgoal.name}({e.name})"
+
+        return readable_sg, axiom
+
+    def from_oe(self, subgoal):
+        logging.debug(
+            f"readable subgoal from one place event pred: {subgoal.name}")
+        e = subgoal.args[0]
+
+        # Get subject and select copula
+        subj = e.subj.getNoun()
+        copula = selectCopula(subj)
+        det = selectDeterminer(subgoal)
+
+        # Get verb phrase and create result
+        vp = e.getVP()
+        if subgoal.pos.startswith('V'):
+            readable_sg = f'The {subj.surf} {copula} {vp}'
+        elif subgoal.pos.startswith('RB'):
+            readable_sg = f'The {subj.surf} {copula} {vp} {subgoal.surf}'
+        elif subgoal.pos.startswith('N'):
+            det = selectDeterminer(subgoal)
+            readable_sg = f'The {subj.surf} {copula}{det}{subgoal.surf}'
+        else:
+            raise ValueError()
+
+        axiom = f"Axiom {vp} : {subgoal.name}({e.name})"
+        return readable_sg, axiom
+
+    def from_tp(self, subgoal):
+        logging.debug(
+            f"readable subgoal from two place preposition pred: {subgoal.name}"
+        )
+        args = subgoal.args
+        if args[0].is_unified():
+            event = args[0]
+            e = args[1]
+        else:
+            event = args[1]
+            e = args[0]
+        subj = event.subj.getNoun()
+        arg_pred = e.getContentWord()
+        copula = selectCopula(subj)
+        det = selectDeterminer(arg_pred)
+        readable_sg = f'The {subj.surf} {copula} {subgoal.surf}{det}{arg_pred.surf}'
+        axiom = f"Axiom {subgoal.name} : {subgoal.name}({event.name},{e.name})"
+        return readable_sg, axiom
+
+    def from_tp_ununified(self, subgoal):
+        logging.debug(
+            f"readable subgoal from un-unified two place preposition pred: {subgoal.name}"
+        )
+        args = subgoal.args
+        if args[0].is_unified():
+            event = args[0]
+            ununified = args[1]
+        else:
+            event = args[1]
+            ununified = args[0]
+        subj = event.subj.getNoun()
+        arg_pred = ununified.getContentWord()
+        copula = selectCopula(subj)
+        det = selectDeterminer(arg_pred)
+        readable_sg = f'The {subj.surf} {copula} {subgoal.surf}{det}{arg_pred.surf}'
+        axiom = f"Axiom {subgoal.name} : {subgoal.name}({event.name},{ununified.getNewName()})"
+        if isinstance(ununified, Entity):
+            axiom += ""
+        elif isinstance(ununified, Event):
+            axiom += ""
+        else:
+            raise ValueError("ununified should be entity or event")
+        return readable_sg, axiom
 
     def visualize(self, with_subgoal=True):
         g = Digraph('G', filename='graph.gv', engine='sfdp')
@@ -314,287 +306,138 @@ class Graph:
 
         for p in self.predicate.values():
             g.node(p.name)
-            for e in p.arg:
+            for e in p.args:
                 g.edge(p.name, e.name)
         g.view()
         return
 
 
 class Predicate():
-    def __init__(self, i, name, pos, arg, subgoal, surf, graph):
-        self.i = i
+    def __init__(self, name, args, pos, surf):
         self.name = name
-        self.surf = surf.lower().split('_')[0]
+        self.surf = surf
         self.pos = pos
-        self.graph = graph
-        self.subgoal = subgoal
-        self.arg = []
-        self.add_arg(arg, subgoal)
+        self.args = []
+        self.addArgs(args)
 
-    def _addEntity(self, ent):
+    def addEntity(self, ent):
         assert isinstance(
             ent,
             Entity), f'non entity {ent} tried to be added to pred {self.name}'
-        self.arg.append(ent)
+        self.args.append(ent)
         ent.addPred(self)
         return
 
-    def _addEvent(self, evt):
+    def addEvent(self, evt):
         assert isinstance(
             evt,
             Event), f'non event {evt} tried to be added to pred {self.name}'
-        self.arg.append(evt)
+        self.args.append(evt)
         evt.addPred(self)
         return
 
-    def add_arg(self, args, subgoal):
+    def getEntity(self):
+        for e in self.args:
+            if isinstance(e, Entity):
+                return e
+        return None
 
-        assert isinstance(args, list)
+    def getEvent(self):
+        for e in self.args:
+            if isinstance(e, Event):
+                return e
+        return None
 
-        for arg in args:
-            assert isinstance(arg, str)
-
-            matched = not arg.startswith('?')
-            if not matched:
-                arg = arg.lstrip('?').replace('z', 'x')
-
-            t, i = parse(arg)
-            if arg in self.graph.var_map:
-                original_name = self.graph.var_map[arg]
+    def addArgs(self, arg):
+        assert isinstance(arg, list)
+        for a in arg:
+            if isinstance(a, Entity):
+                self.addEntity(a)
+            elif isinstance(a, Event):
+                self.addEvent(a)
             else:
-                original_name = arg
-
-            if t == 'e':
-
-                if subgoal:
-                    # If it has corresponding entity then make a new e with + 1000
-                    if matched:
-                        matched_e = self.graph.events[i]
-                        i += 1000
-                    # If not matched make a unmatched with +500
-                    else:
-                        i += 500
-
-                if i not in self.graph.events:
-                    self.graph.addEvent(Event(i, original_name, subgoal))
-                event = self.graph.events[i]
-                self._addEvent(event)
-
-                if subgoal and matched:
-                    event.add_match(matched_e)
-
-            elif t == 'x':
-
-                if subgoal:
-                    # If it has corresponding entity then make a new e with + 1000
-                    if matched:
-                        matched_e = self.graph.entities[i]
-                        i += 1000
-                    # If not matched make a unmatched with +500
-                    else:
-                        i += 500
-
-                if i not in self.graph.entities:
-                    self.graph.addEntity(Entity(i, original_name, subgoal))
-                entity = self.graph.entities[i]
-                self._addEntity(entity)
-
-                if subgoal and matched:
-                    entity.add_match(matched_e)
-
-            else:
-                raise ValueError(f't={t} which should be x or e')
-
-        # Make first arg Event always for preposition
-        if len(arg) == 2 and isinstance(args[0], Entity):
-            args[0], args[1] = args[1], args[0]
+                raise ValueError("Arg should be Entity or Event")
         return
 
+    def is_ox(self):
+        return len(self.args) == 1 and isinstance(self.args[0], Entity)
 
-class Entity:
-    def __init__(self, i, original_name, subgoal=False):
-        self.i = int(i)
-        self.original_name = original_name
+    def is_oe(self):
+        return len(self.args) == 1 and isinstance(self.args[0], Event)
+
+    def is_tp(self):
+        return len(self.args) == 2
+
+    def is_unified(self):
+        return all([e.is_unified() for e in self.args])
+
+
+class Variable:
+    def __init__(self, name):
+        self.name = name
         self.predicates = []
-        self.name = f'x{self.i}'
-        self.subgoal = subgoal
-        self.matched = None  # for subgoal entity, this is the matched entity
-        self.matched_by = None  # for matched entity, this is the subgoal entity
-        self.core_pred = None
-        self.core_prop = None
         return
 
     def addPred(self, p):
         assert isinstance(p, Predicate)
         self.predicates.append(p)
-        if p.pos.startswith('NN'):
-            self.core_pred = p
-        if len(p.arg) == 2:
-            self.core_prop = p
         return
 
-    def pos_order(self, pred):
-        if pred.pos.startswith('NN'):
-            return 200 + pred.i
-        elif pred.pos.startswith('JJ'):
-            return 100 + pred.i
-        elif pred.pos.startswith('CD'):
-            return -100 + pred.i
-        elif pred.pos.startswith('RB'):
-            return 300 + pred.i
-        else:
-            return -200 + pred.i
+    def is_unified(self):
+        return not self.name.startswith("?")
 
-    def get_all_pred_str(self):
-        acc = []
-        for p in sorted(self.predicates, key=self.pos_order):
-            if len(p.arg) == 1:
-                acc.append(p)
-        result = ' '.join([p.name for p in acc])
-        if acc[-1].pos.startswith('NN'):
-            result = f'a {result}'
+    def getNewName(self):
+        assert not self.is_unified()
+        return self.name.lstrip("?")
+
+    def getContentWord(self):
+        for p in self.predicates:
+            if not p.pos == "IN":
+                return p
+        return
+
+
+class Entity(Variable):
+    def __init__(self, name):
+        super().__init__(name)
+        return
+
+    def getNoun(self):
+        for p in self.predicates:
+            if p.pos.startswith('N'):
+                return p
+        return None
+
+    def getProp(self):
+        for p in self.predicates:
+            if p.pos == 'IN':
+                return p
+        return
+
+
+class Event(Variable):
+    def __init__(self, name):
+        super().__init__(name)
+        return
+
+    def getVerb(self):
+        for p in self.predicates:
+            if p.pos.startswith('V'):
+                return p
+        return None
+
+    def getVP(self):
+        verb = self.getVerb()
+        result = verb.surf
+        if hasattr(verb, 'acc'):
+            acc = verb.acc
+            det = selectDeterminer(acc)
+            result += f'{det} {acc.surf}'
+            if hasattr(verb, 'dat'):
+                dat = verb.dat
+                det = selectDeterminer(dat)
+                result += f'to {det} {dat.surf}'
         return result
-
-    def add_match(self, e):
-        self.matched = e
-        e.matched_by = self
-        return
-
-
-class Event:
-    def __init__(self, i, original_name, subgoal=False):
-        self.i = int(i)
-        self.original_name = original_name
-        self.predicates = []
-        self.name = f'e{self.i}'
-        self.subgoal = subgoal
-        self.matched = None
-        self.matched_by = None
-        self.core_pred = None
-        return
-
-    def pos_order(self, pred):
-        if pred.pos.startswith('V'):
-            return 100 + pred.i
-        elif pred.pos.startswith('RB'):
-            return 200 + pred.i
-        else:
-            return 300 + pred.i
-
-    def get_props(self):
-        return [x for x in self.predicates if len(x.arg) == 2]
-
-    def addPred(self, p):
-        assert isinstance(p, Predicate)
-        self.predicates.append(p)
-        if p.pos.startswith('V'):
-            self.core_pred = p
-        return
-
-    def addRelation(self, x: Entity, name: str):
-        assert isinstance(x, Entity) and not hasattr(self, name)
-        setattr(self, name.lower(), x)
-
-    def get_pr(self, verb):
-        """
-        Get predicate arguments from subgoal event
-        """
-
-        assert self.subgoal
-
-        # check if this event has predicate argument (this should be conclusion specific predicate argument)
-        if hasattr(self, 'acc'):
-            if self.acc.subgoal:
-                if self.acc.matched is not None:
-                    acc = self.acc.matched.core_pred
-                # unmatched acc which only exists in conclusion
-                else:
-                    acc = self.acc.core_pred
-            else:
-                if self.acc.matched_by is not None:
-                    acc = self.acc.matched_by.core_pred
-                else:
-                    acc = self.acc.core_pred
-
-            if acc.pos in {'NN', 'NNP'}:
-                verb += f' a {acc.surf}'
-            else:
-                verb += f' {acc.surf}'
-
-        # if not check matched event in premise
-        # self doesn't have acc but matched has? when does this occur
-        elif hasattr(self.matched, 'acc'):
-            breakpoint()
-            if self.matched.acc.matched_by is not None:
-                acc = self.matched.acc.matched_by.core_pred
-            else:
-                acc = self.matched.acc.core_pred
-
-            if acc.pos in {'NN', 'NNP'}:
-                verb += f' a {acc.surf}'
-            else:
-                verb += f' {acc.surf}'
-
-        if hasattr(self, 'dat'):
-            if self.dat.subgoal:
-
-                if self.dat.matched is not None:
-                    dat = self.dat.matched.core_pred
-
-                # unmatched dat which only exists in conclusion
-                else:
-                    dat = self.dat.core_pred
-            else:
-                if self.dat.matched_by is not None and self.dat.matched_by.core_pred is not None:
-                    dat = self.dat.matched_by.core_pred
-                else:
-                    dat = self.dat.core_pred
-            if dat.pos in {'NN', 'NNP'}:
-                verb += f' to a {dat.surf}'
-            else:
-                verb += f' to {dat.surf}'
-
-        # if not check matched event in premise
-        # self doesn't have dat but matched has? when does this occur
-        elif hasattr(self.matched, 'dat'):
-            breakpoint()
-            if self.matched.dat.matched_by is not None:
-                dat = self.matched.dat.matched_by.core_pred
-            else:
-                dat = self.matched.dat.core_pred
-
-            if dat.pos in {'NN', 'NNP'}:
-                verb += f' to a {dat.surf}'
-            else:
-                verb += f' to {dat.surf}'
-
-        return verb
-
-    def get_all_pred_str(self):
-        acc = []
-        for p in sorted(self.predicates, key=self.pos_order):
-            if len(p.arg) == 1:
-                acc.append(p)
-        result = ' '.join([p.name for p in acc])
-        if acc[-1].pos in {'NN', 'NNP'}:
-            result = f'a {result}'
-        return result
-
-    def add_match(self, e):
-        self.matched = e
-        e.matched_by = self
-        return
-
-
-def parse(x):
-    assert isinstance(x, str)
-    t = x[0]
-    i = x[1:]
-    if i == '':
-        i = 999
-    else:
-        i = int(i)
-    return t, i
 
 
 def progressive(p):
@@ -608,3 +451,71 @@ def progressive(p):
         p.name = p.name.rstrip('e')
     p.name = p.name + 'ing'
     return p
+
+
+def seperate_lines(premise_lines):
+    type_lines = []
+    pred_lines = []
+    for line in premise_lines:
+        if not line.startswith("H"):
+            type_lines.append(line)
+        elif line.endswith("True"):
+            continue
+        else:
+            pred_lines.append(line)
+    return type_lines, pred_lines
+
+
+def get_attrs(tok):
+    base = tok.attrib.get('base')
+    pos = tok.attrib.get('pos')
+    surf = tok.attrib.get('surf')
+    return base, pos, surf
+
+
+def clean_pred_name(x):
+    pred_name = x.split()[0].lstrip("_")
+    if "_" in pred_name:
+        pred_name = pred_name.split("_")[0]
+    return pred_name
+
+
+def handleSemanticRoleArgs(args):
+    if len(args) == 1:
+        return args
+    elif args[0].startswith("("):
+        if len(args) == 2:
+            return [merge(args[0], args[1])]
+        elif len(args) == 3:
+            return [merge(args[0], args[1]), args[2]]
+        elif len(args) >= 4:
+            breakpoint()
+    elif args[1].startswith("("):
+        if len(args) == 3:
+            return [args[0], merge(args[1], args[2])]
+        elif len(args) >= 4:
+            breakpoint()
+    else:
+        return args
+
+
+def merge(x, y):
+    return f"{x} {y}".strip("()")
+
+
+def isSemanticRole(a):
+    return a.startswith("Subj") or a.startswith("Acc") or a.startswith("Dat")
+
+
+def selectCopula(x):
+    if x.pos in {'NN', 'NNP'}:
+        return 'is'
+    else:
+        return 'are'
+
+
+def selectDeterminer(x):
+    if x.pos in {'NN', 'NNP'}:
+        return " a "
+    else:
+        return ' '

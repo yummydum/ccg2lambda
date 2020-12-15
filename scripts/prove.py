@@ -97,13 +97,19 @@ def prove(args):
     except TimeoutExpired:
         return
     # parse error?
-    except AttributeError:
-        return
+    # except AttributeError as err:
+    #     print(err)
+    #     return
+    except Exception as err:
+        raise Exception(err)
+
+    if not theorem.created_axioms:
+        return theorem
 
     result = {}
     result["pair_id"] = args.id
-    result["premise"] = theorem.original
-    result["conclusion"] = theorem.original2
+    result["premise"] = theorem.premise_sentence
+    result["conclusion"] = theorem.hypothesis_sentence
     result["premise_formula"] = clean(theorem.premises[0])
     result["conclusion_formula"] = clean(theorem.conclusion)
     result["subgoals"] = theorem.subgoal

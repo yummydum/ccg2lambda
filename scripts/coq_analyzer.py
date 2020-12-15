@@ -19,13 +19,10 @@ from __future__ import print_function
 from collections import OrderedDict
 import logging
 import re
-from pyparsing import nestedExpr
 from nltk import Tree
 
 from normalization import denormalize_token
 from tree_tools import tree_or_string, tree_contains
-
-from graph import Graph, Event, Entity
 
 
 def find_final_subgoal_line_index(coq_output_lines):
@@ -97,8 +94,6 @@ def get_premises_that_match_conclusion_args_(premises, conclusion):
     for premise in premises:
         premise_terms = [p.strip(')(') for p in premise.split()[2:]]
         premise_args = set(premise_terms[1:])
-        logging.debug('Conclusion args: ' + str(conclusion_args) +
-                      '\nPremise args: ' + str(premise_args))
         if premise_args.intersection(conclusion_args):
             candidate_premises.append(premise)
     return candidate_premises
@@ -118,8 +113,6 @@ def get_premises_that_match_conclusion_args(premises, conclusion):
         # Convert anonymous variables of the form ?345 into ?x345.
         premise_line = re.sub(r'\?([0-9]+)', r'?x\1', premise_line)
         premise_args = get_tree_pred_args(premise_line)
-        logging.debug('Conclusion args: ' + str(conclusion_args) +
-                      '\nPremise args: ' + str(premise_args))
         if tree_contains(premise_args, conclusion_args):
             candidate_premises.append(premise_line)
     return candidate_premises
@@ -299,29 +292,6 @@ def get_tree_pred_args(line, is_conclusion=False):
     return tree_args[0]
 
 
-def get_tree_pred_args2(line, is_conclusion=False):
-    """
-    Given the string representation of a premise, where each premise is:
-      pX : predicate1 (arg1 arg2 arg3)
-      pY : predicate2 arg1
-    or the conclusion, which is of the form:
-      predicate3 (arg2 arg4)
-    returns a tree or a string with the arguments of the predicate.
-    """
-    tree_args = None
-    if not is_conclusion:
-        tree_args = parse_coq_line(' '.join(line.split()[2:]))
-    else:
-        tree_args = parse_coq_line(line)
-
-    if tree_args is None or len(tree_args) < 1:
-        return None
-    if tree_args.height() >= 3:
-        return tree_args
-    else:
-        return tree_args.leaves()  # return leave args (list, str)
-
-
 def get_predicate_arguments(premises, conclusion):
     """
     Given the string representations of the premises, where each premises is:
@@ -367,70 +337,16 @@ def get_predicate_arguments(premises, conclusion):
     return pred_args
 
 
-def make_graph(theorem, premises, subgoals, var_map):
-    graph = Graph(var_map)
-    original_text = list(theorem.pos.keys())
-    for premise in premises:
-        if '=' not in premise:
-            pred_name = premise.split(' ')[0].split('_')[1]
-            arg = premise.split(' ')[1:]
-            i = original_text.index(pred_name)
-            surf = theorem.surf[pred_name]
-            pos = theorem.pos[pred_name]
-            graph.addPred(i, pred_name, pos, arg, surf, subgoal=False)
-
-    original_text = list(theorem.pos2.keys())
+def add_subgoals2graph(graph, subgoals):
     for goal in subgoals:
-        if '=' not in goal:
-            pred_name = goal.split(' ')[0].split('_')[1]
-            arg = goal.split(' ')[1:]
-            i = original_text.index(pred_name)
-            surf = theorem.surf2[pred_name]
-            pos = theorem.pos2[pred_name]
-            graph.addPred(i, pred_name, pos, arg, surf, subgoal=True)
-
-    for premise in premises:
-        if '=' in premise:
-            if len(premise.split()) != 4:
-                continue  # ignore for now?
-            name, event, _, entity = premise.split()
-            graph.addRelation(event, entity, name)
-
-    for goal in subgoals:
-        if '=' in goal:
-            if len(goal.split()) == 4:
-                name, event, _, entity = goal.split()
-                graph.addSubgoalRelation(event, entity, name)
-            if len(goal.split()) == 5:
-                name1, event1, _, name2, event2 = goal.split()
-                graph.relation_subgoal.append([[name1, event1],
-                                               [name2, event2]])
-
-    return graph
-
-
-def get_matched_premises(theorem):
-    try:
-        output_lines = theorem.output_lines
-        premise_lines = get_premise_lines(output_lines)
-        conclusion = get_conclusion_line(output_lines)
-        subgoals = get_subgoals_from_coq_output2(output_lines)
-        premises, subgoals, var_map = preprocess(premise_lines, conclusion,
-                                                 subgoals)
-
-        # Skip too many subgoals
-        theorem.subgoal = subgoals
-        if len(subgoals) >= 10:
-            return {}
-
-        graph = make_graph(theorem, premises, subgoals, var_map)
-        # graph.visualize()
-        graph.create_readable_subgoals()
-        theorem.readable_subgoals = graph.readable_subgoals
-        theorem.created_axioms = graph.created_axioms
-        theorem.axiom_error = False
-    except ValueError:
-        theorem.axiom_error = True
+        pred = goal.split()[0].lstrip("_")
+        var = " ".join(goal.split()[1:])
+        var = var.strip("()")
+        if var.startswith("?"):
+            pass
+        else:
+            breakpoint()
+            graph.addPredicate(pred)
     return
 
 
@@ -449,108 +365,3 @@ def get_subgoals_from_coq_output2(coq_output_lines):
             is_subgoal = False
 
     return subgoals
-
-
-def preprocess_sr(premises, subgoals, var_map):
-    premises = sorted(premises, key=lambda x: len(x.split('(')))
-    events = set()
-    max_ind = 100  # fix this?
-    result = []
-    replace_dict = {}
-    for p in premises:
-        arg = get_tree_pred_args2(p)
-        if isinstance(arg, Tree):
-            for elem in arg:
-                if isinstance(elem, Tree):
-                    label = elem.label()
-                    leave = elem.leaves()
-                    event = leave[0]
-                    # assert event in events
-                    original = f'({label} {event})'
-
-                    if original in replace_dict:
-                        ent = replace_dict[original]
-                    else:
-                        ent = f'x{max_ind}'
-                        replace_dict[original] = ent
-                        var_map[ent] = original
-                        max_ind += 1
-
-                    result.append(p.replace(original, ent))
-                    result.append(f'{label} {event} = {ent}')
-
-                    for i in range(len(subgoals)):
-                        subgoals[i] = subgoals[i].replace(original, ent)
-
-                else:
-                    if elem.startswith('e'):
-                        events.add(x)
-
-        elif isinstance(arg, list):
-            for x in arg:
-                if x.startswith('e'):
-                    events.add(x)
-            result.append(p)
-
-        else:
-            raise ValueError()
-    return result, subgoals, var_map
-
-
-def handle_unmatched(subgoals, var_map):
-    max_ind = 200
-    for i in range(len(subgoals)):
-        temp = f'H : {subgoals[i]}'
-        arg = get_tree_pred_args2(temp)
-        if isinstance(arg, Tree):
-            tree = arg[0]
-            label = tree.label()
-            event = tree.leaves()[0]
-            original = f'({label} {event})'
-            ent = f'?x{max_ind}'
-            subgoals[i] = subgoals[i].replace(original, ent)
-            var_map[ent] = original
-            max_ind += 1
-            subgoals.append(f'{label} {event} = {ent}')
-    return subgoals, var_map
-
-
-def preprocess_variables(premises, subgoals):
-    var_map = {}
-    type_prop = [x for x in premises if x.endswith('Event')]
-    for t in type_prop:
-        var = t.split(' : ')[0]
-        for x in var.split(','):
-            x = x.strip(' ')
-            e = x.replace('x', 'e')
-            var_map[e] = x
-            # Replace x to e
-            for i in range(len(premises)):
-                premises[i] = premises[i].replace(x, e)
-            for i in range(len(subgoals)):
-                subgoals[i] = subgoals[i].replace(x, e)
-
-    # Filter True and variable types
-    premises = [
-        x for x in premises if x.startswith('H') and not x.endswith('True')
-    ]
-
-    return premises, subgoals, var_map
-
-
-def preprocess(premises, conclusion, subgoals):
-    subgoals.append(conclusion)
-    premises, subgoals, var_map = preprocess_variables(premises, subgoals)
-    premises, subgoals, var_map = preprocess_sr(premises, subgoals, var_map)
-    subgoals, var_map = handle_unmatched(subgoals, var_map)
-
-    # Filter H
-    premises = [
-        x.split(' : ')[1] if x.startswith('H') else x for x in premises
-    ]
-
-    # one argument predicate comes in front
-    premises = sorted(premises, key=lambda x: len(x.split(' ')))
-    subgoals = sorted(subgoals, key=lambda x: len(x.split(' ')))
-
-    return premises, subgoals, var_map
