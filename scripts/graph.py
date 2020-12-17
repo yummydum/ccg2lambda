@@ -13,23 +13,28 @@ class Graph:
         self.events = dict()
         self.unmatched_entities = dict()
         self.unmatched_events = dict()
-        self.prem_pred = dict()
+        self.prem_pred = []
         self.subgoal_pred = []
+        self.sr_goal = []
+        self.readable_subgoals = []
+        self.created_axioms = []
         return
 
     def addEntity(self, name, is_unified=True):
-        assert name not in self.entities
         if is_unified:
+            assert name not in self.entities
             self.entities[name] = Entity(name)
         else:
+            assert name not in self.unmatched_entities
             self.unmatched_entities[name] = Entity(name)
         return
 
     def addEvent(self, name, is_unified=True):
-        assert name not in self.events
         if is_unified:
+            assert name not in self.events
             self.events[name] = Event(name)
         else:
+            assert name not in self.unmatched_events
             self.unmatched_events[name] = Event(name)
         return
 
@@ -61,12 +66,12 @@ class Graph:
             else:
                 raise ValueError(f"{name} is not found in the graph")
 
-    def setSemanticRole(self, entity_name):
+    def setSemanticRole(self, entity_name, is_unified=True):
         relation, event_name = entity_name.split(" ")
         relation = relation.lower()
         event = self.getEvent(event_name)
         assert not hasattr(event, relation)
-        entity = self.getEntity(entity_name)
+        entity = self.getEntity(entity_name, is_unified=is_unified)
         setattr(event, relation, entity)
         return
 
@@ -81,7 +86,7 @@ class Graph:
                 raise ValueError("Type should be Entity or Event")
 
     def addPremise(self, premise_lines):
-        logging.debug(premise_lines)
+        logging.debug(f"Premise line: {premise_lines}")
         type_lines, pred_lines = seperate_lines(premise_lines)
         self.addEs(type_lines)
 
@@ -92,6 +97,8 @@ class Graph:
             base, pos, surf = get_attrs(tok)
             d[base] = pos, surf
             self.premise.append(surf)
+
+        logging.debug("Premise: " + " ".join(self.premise))
 
         # add preds
         for line in pred_lines:
@@ -110,17 +117,20 @@ class Graph:
                 args2.append(self.getE(a))
 
             pos, surf = d[pred_name]
-            self.prem_pred[pred_name] = Predicate(pred_name, args2, pos, surf)
+            p = Predicate(pred_name, args2, pos, surf, is_premise=True)
+            self.prem_pred.append(p)
         return
 
     def addSubgoals(self, subgoal_line):
-        logging.debug(subgoal_line)
+        logging.debug(f"Subgoal line: {subgoal_line}")
         tokens = self.theorem.doc.xpath('./sentences/sentence[2]/tokens')[0]
         d = dict()
         for tok in tokens:
             base, pos, surf = get_attrs(tok)
             d[base] = pos, surf
-            self.hypothesis.append(base)
+            self.hypothesis.append(surf)
+
+        logging.debug("Hypothesis: " + " ".join(self.hypothesis))
 
         for goal in subgoal_line:
             if "=" not in goal:
@@ -132,16 +142,25 @@ class Graph:
                 args = handleSemanticRoleArgs(args)
                 args = self.handleUnunifiedE(args)
                 pos, surf = d[pred_name]
-                p = Predicate(pred_name, args, pos, surf)
+                p = Predicate(pred_name, args, pos, surf, is_premise=False)
                 self.subgoal_pred.append(p)
             else:
-                print("TODO: = in goal")
-                breakpoint()
+                first, second = goal.split(" = ")
+                first = self.getE(first)
+                second = self.getE(second)
+                self.sr_goal.append((first, second))
         return
 
     def handleUnunifiedE(self, args):
+        """
+        Handle variables which are un-unified
+        1) Preposition argument only in hypothesis
+        2) Semantic role only in hypothesis
+        """
         result = []
         for a in args:
+
+            # 1)
             if a.startswith("?x") or a.startswith("?y") or a.startswith("?z"):
                 if a not in self.unmatched_entities:
                     self.addEntity(a, is_unified=False)
@@ -150,17 +169,30 @@ class Graph:
                 if a not in self.unmatched_events:
                     self.addEvent(a, is_unified=False)
                 result.append(self.getEvent(a, is_unified=False))
+
+            # 2)
+            elif isSemanticRole(a):
+                b1 = a not in self.entities  # un-unified
+                b2 = a not in self.unmatched_entities  # not added to unmatched ent yet
+                if b1 and b2:
+                    self.addEntity(a, is_unified=False)
+                    self.setSemanticRole(a, is_unified=False)
+                if b1:
+                    x = self.getEntity(a, is_unified=False)
+                else:
+                    x = self.getEntity(a, is_unified=True)
+                result.append(x)
             else:
                 result.append(self.getE(a))
         return result
 
     def create_readable_subgoals(self):
-        readable_subgoals = []
-        created_axioms = []
         for pred in self.subgoal_pred:
             if pred.is_unified():
                 if pred.is_ox():
                     readable_sg, axiom = self.from_ox(pred)
+                    if readable_sg is None:
+                        continue
                 elif pred.is_oe():
                     readable_sg, axiom = self.from_oe(pred)
                 else:
@@ -171,16 +203,30 @@ class Graph:
                     readable_sg, axiom = self.from_tp_ununified(pred)
                 else:
                     continue
-            readable_subgoals.append(readable_sg)
-            created_axioms.append(axiom)
-            logging.debug((readable_sg, axiom))
-        return readable_subgoals, created_axioms
+            self.collect_result(readable_sg, axiom)
+
+        for first, second in self.sr_goal:
+            self.collect_result(*self.from_sr(first, second))
+
+        return self.readable_subgoals, self.created_axioms
+
+    def collect_result(self, readable_sg, axiom):
+        self.readable_subgoals.append(readable_sg)
+        self.created_axioms.append(axiom)
+        logging.debug((readable_sg, axiom))
+        return
 
     def from_ox(self, subgoal):
         logging.debug(
             f"readable subgoal from one place entity pred: {subgoal.name}")
-        e = subgoal.args[0]
-        subj = e.getNoun()
+        entity = subgoal.args[0]
+        subj = entity.getNoun(is_premise=True)
+        if subj is None:
+            logging.debug(
+                f"""Skipping {subgoal.name} since it has no corresponding entity in premise. 
+                This should be handled in the new predicate which introduced this new semantic role.
+                """)
+            return None, None
 
         if subgoal.pos == 'IN':
             print("One place IN taking x??")
@@ -193,22 +239,22 @@ class Graph:
             readable_sg = f"There are {subgoal.surf} {subj.surf}"
         else:
             readable_sg = f'The {subj.surf} {copula}{det}{subgoal.surf}'
-        axiom = f"Axiom {subgoal.surf} : {subgoal.name}({e.name})"
+        axiom = f"Axiom {subgoal.surf} : _{subgoal.name}({entity.name})"
 
         return readable_sg, axiom
 
     def from_oe(self, subgoal):
         logging.debug(
             f"readable subgoal from one place event pred: {subgoal.name}")
-        e = subgoal.args[0]
+        event = subgoal.args[0]
 
         # Get subject and select copula
-        subj = e.subj.getNoun()
+        subj = event.subj.getNoun(is_premise=True)
         copula = selectCopula(subj)
         det = selectDeterminer(subgoal)
 
         # Get verb phrase and create result
-        vp = e.getVP()
+        vp = event.getVP(subgoal)
         if subgoal.pos.startswith('V'):
             readable_sg = f'The {subj.surf} {copula} {vp}'
         elif subgoal.pos.startswith('RB'):
@@ -219,7 +265,7 @@ class Graph:
         else:
             raise ValueError()
 
-        axiom = f"Axiom {vp} : {subgoal.name}({e.name})"
+        axiom = f"Axiom {vp} : _{subgoal.name}({event.name})"
         return readable_sg, axiom
 
     def from_tp(self, subgoal):
@@ -233,7 +279,7 @@ class Graph:
         else:
             event = args[1]
             e = args[0]
-        subj = event.subj.getNoun()
+        subj = event.subj.getNoun(is_premise=True)
         arg_pred = e.getContentWord()
         copula = selectCopula(subj)
         det = selectDeterminer(arg_pred)
@@ -252,8 +298,8 @@ class Graph:
         else:
             event = args[1]
             ununified = args[0]
-        subj = event.subj.getNoun()
-        arg_pred = ununified.getContentWord()
+        subj = event.subj.getNoun(is_premise=True)
+        arg_pred = ununified.getContentWord(is_premise=False)
         copula = selectCopula(subj)
         det = selectDeterminer(arg_pred)
         readable_sg = f'The {subj.surf} {copula} {subgoal.surf}{det}{arg_pred.surf}'
@@ -266,46 +312,37 @@ class Graph:
             raise ValueError("ununified should be entity or event")
         return readable_sg, axiom
 
-    def visualize(self, with_subgoal=True):
-        g = Digraph('G', filename='graph.gv', engine='sfdp')
+    def from_sr(self, first, second):
+        logging.debug(
+            f"readable subgoal from semantic role equality {first.name} {second.name}"
+        )
+        subj = first.getNoun(is_premise=True)
+        pred = second.getNoun(is_premise=True)
+        copula = selectCopula(subj)
+        det = selectDeterminer(pred)
+        readable_sg = f'The {subj.surf} {copula}{det}{pred.surf}'
+        axiom = f"Axiom {subj.surf}_is_{pred.surf} : {first.name} = {second.name}"
+        return readable_sg, axiom
 
+    def visualize(self):
+        g = Digraph('G', filename='graph.gv', engine='sfdp')
         for e in self.entities.values():
-            if e.subgoal:
-                if not with_subgoal:
-                    continue
-                else:
-                    g.node(e.name, color='lightpink', style='filled')
-                    if e.matched is not None:
-                        g.edge(e.name, e.matched.name, label='unified')
-            else:
-                g.node(e.name,
-                       shape='box',
-                       color='aquamarine2',
-                       style='filled')
+            g.node(e.name, style='filled')
 
         for e in self.events.values():
-
-            if e.subgoal:
-                if not with_subgoal:
-                    continue
-                else:
-                    g.node(e.name, color='lightpink', style='filled')
-                    if e.matched is not None:
-                        g.edge(e.name, e.matched.name, label='unified')
-
-            else:
-                g.node(e.name,
-                       shape='box',
-                       color='aquamarine2',
-                       style='filled')
-
+            g.node(e.name, style='filled')
             for sr in ['subj', 'acc', 'dat']:
                 if hasattr(e, sr):
                     ent = getattr(e, sr)
                     g.edge(e.name, ent.name, label=sr)
 
-        for p in self.predicate.values():
+        for p in self.prem_pred:
             g.node(p.name)
+            for e in p.args:
+                g.edge(p.name, e.name)
+
+        for p in self.subgoal_pred:
+            g.node(p.name, color='lightpink', style='filled')
             for e in p.args:
                 g.edge(p.name, e.name)
         g.view()
@@ -313,11 +350,12 @@ class Graph:
 
 
 class Predicate():
-    def __init__(self, name, args, pos, surf):
+    def __init__(self, name, args, pos, surf, is_premise):
         self.name = name
-        self.surf = surf
+        self.surf = surf.lower()
         self.pos = pos
         self.args = []
+        self.is_premise = is_premise
         self.addArgs(args)
 
     def addEntity(self, ent):
@@ -375,13 +413,27 @@ class Predicate():
 class Variable:
     def __init__(self, name):
         self.name = name
-        self.predicates = []
+        self.premise_predicates = []
+        self.hypothesis_predicates = []
         return
 
     def addPred(self, p):
         assert isinstance(p, Predicate)
-        self.predicates.append(p)
+        if p.is_premise:
+            self.premise_predicates.append(p)
+        else:
+            self.hypothesis_predicates.append(p)
         return
+
+    def getPred(self, pred):
+        if pred.is_premise:
+            predicates = self.premise_predicates
+        else:
+            predicates = self.hypothesis_predicates
+        for p in predicates:
+            if pred.name == p.name:
+                return pred
+        return None
 
     def is_unified(self):
         return not self.name.startswith("?")
@@ -390,8 +442,12 @@ class Variable:
         assert not self.is_unified()
         return self.name.lstrip("?")
 
-    def getContentWord(self):
-        for p in self.predicates:
+    def getContentWord(self, is_premise=True):
+        if is_premise:
+            predicates = self.premise_predicates
+        else:
+            predicates = self.hypothesis_predicates
+        for p in predicates:
             if not p.pos == "IN":
                 return p
         return
@@ -402,8 +458,13 @@ class Entity(Variable):
         super().__init__(name)
         return
 
-    def getNoun(self):
-        for p in self.predicates:
+    def getNoun(self, is_premise):
+        if is_premise:
+            predicates = self.premise_predicates
+        else:
+            predicates = self.hypothesis_predicates
+
+        for p in predicates:
             if p.pos.startswith('N'):
                 return p
         return None
@@ -420,23 +481,39 @@ class Event(Variable):
         super().__init__(name)
         return
 
-    def getVerb(self):
-        for p in self.predicates:
+    def getVerb(self, is_premise):
+        if is_premise:
+            predicates = self.premise_predicates
+        else:
+            predicates = self.hypothesis_predicates
+
+        for p in predicates:
             if p.pos.startswith('V'):
                 return p
         return None
 
-    def getVP(self):
-        verb = self.getVerb()
+    def getVP(self, pred):
+        if pred.pos == "RB":
+            verb = self.getVerb(is_premise=True)
+        else:
+            verb = pred
         result = verb.surf
-        if hasattr(verb, 'acc'):
-            acc = verb.acc
+        if hasattr(self, 'acc'):
+            # If there are ununified semantic role then use them
+            acc = self.acc.getNoun(is_premise=False)
+            # Else use ones in the premise
+            if acc is None:
+                acc = self.acc.getNoun(is_premise=True)
             det = selectDeterminer(acc)
-            result += f'{det} {acc.surf}'
-            if hasattr(verb, 'dat'):
-                dat = verb.dat
+            result += f'{det}{acc.surf}'
+            if hasattr(self, 'dat'):
+                # If there are ununified semantic role then use them
+                dat = self.dat.getNoun(is_premise=False)
+                # Else use ones in the premise
+                if dat is None:
+                    dat = self.dat.getNoun(is_premise=True)
                 det = selectDeterminer(dat)
-                result += f'to {det} {dat.surf}'
+                result += f' to{det}{dat.surf}'
         return result
 
 

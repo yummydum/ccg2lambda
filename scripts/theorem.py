@@ -55,6 +55,8 @@ class Theorem(object):
                  dynamic_library_str='',
                  is_negated=False,
                  is_reversed=False):
+        premises = [rename_variable(remove_true(x)) for x in premises]
+        conclusion = rename_variable(remove_true(conclusion))
         self.premises = premises
         self.conclusion = conclusion
         self.axioms = set() if axioms is None else axioms
@@ -250,9 +252,14 @@ class Theorem(object):
                 self.result2 = 'entailment'
                 return
 
-        print('readable subgoal')
+        print("non_neg_theorem")
         self.create_noneg_conclusion()
         self.prove_debug(use_noneg=True)
+        if self.inference_result:
+            self.result2 = 'contradiction'
+            return
+
+        print('readable subgoal')
         self.create_readable_subgoals()
         self.prove_debug(axioms=self.created_axioms)
         return
