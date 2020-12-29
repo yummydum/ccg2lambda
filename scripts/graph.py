@@ -239,7 +239,7 @@ class Graph:
             readable_sg = f"There are {subgoal.surf} {subj.surf}"
         else:
             readable_sg = f'The {subj.surf} {copula}{det}{subgoal.surf}'
-        axiom = f"Axiom {subgoal.surf} : _{subgoal.name}({entity.name})"
+        axiom = f"Axiom ax_{subgoal.surf} : forall x, _{subj.name} x -> _{subgoal.name} x."
 
         return readable_sg, axiom
 
@@ -265,7 +265,12 @@ class Graph:
         else:
             raise ValueError()
 
-        axiom = f"Axiom {vp} : _{subgoal.name}({event.name})"
+        premise_pred = event.premise_predicates[0]
+        if len(premise_pred.args) == 1:
+            antecedent = f"forall x, _{premise_pred.name} x"
+        else:
+            antecedent = f"forall x, exists y, _{premise_pred.name} x y"
+        axiom = f"Axiom ax_{vp} : {antecedent} -> _{subgoal.name} x."
         return readable_sg, axiom
 
     def from_tp(self, subgoal):
@@ -284,7 +289,7 @@ class Graph:
         copula = selectCopula(subj)
         det = selectDeterminer(arg_pred)
         readable_sg = f'The {subj.surf} {copula} {subgoal.surf}{det}{arg_pred.surf}'
-        axiom = f"Axiom {subgoal.name} : {subgoal.name}({event.name},{e.name})"
+        axiom = f"Axiom ax_{subgoal.name} : forall x, exists y, exists z, _{subj.name} x -> _{subgoal.name} y z /\ _{arg_pred.name} z."
         return readable_sg, axiom
 
     def from_tp_ununified(self, subgoal):
@@ -303,13 +308,7 @@ class Graph:
         copula = selectCopula(subj)
         det = selectDeterminer(arg_pred)
         readable_sg = f'The {subj.surf} {copula} {subgoal.surf}{det}{arg_pred.surf}'
-        axiom = f"Axiom {subgoal.name} : {subgoal.name}({event.name},{ununified.getNewName()})"
-        if isinstance(ununified, Entity):
-            axiom += ""
-        elif isinstance(ununified, Event):
-            axiom += ""
-        else:
-            raise ValueError("ununified should be entity or event")
+        axiom = f"Axiom ax_{subgoal.name}_{arg_pred.surf} : forall x, exists y, exists z, _{subj.name} x -> _{subgoal.name} y z /\ _{arg_pred.name} z."
         return readable_sg, axiom
 
     def from_sr(self, first, second):
@@ -552,8 +551,8 @@ def get_attrs(tok):
 
 def clean_pred_name(x):
     pred_name = x.split()[0].lstrip("_")
-    if "_" in pred_name:
-        pred_name = pred_name.split("_")[0]
+    # if "_" in pred_name:
+    #     pred_name = pred_name.split("_")[0]
     return pred_name
 
 
@@ -566,7 +565,7 @@ def handleSemanticRoleArgs(args):
         elif len(args) == 3:
             return [merge(args[0], args[1]), args[2]]
         elif len(args) >= 4:
-            breakpoint()
+            return [merge(args[0], args[1]), merge(args[2], args[3])]
     elif args[1].startswith("("):
         if len(args) == 3:
             return [args[0], merge(args[1], args[2])]

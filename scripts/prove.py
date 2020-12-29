@@ -101,6 +101,7 @@ def prove(args):
     #     print(err)
     #     return
     except Exception as err:
+        # return
         raise Exception(err)
 
     if not theorem.created_axioms:

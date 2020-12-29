@@ -204,14 +204,9 @@ class Theorem(object):
         self.output_lines = output_lines
 
         if is_theorem_defined(output_lines):
-
-            if axioms is None:
-                self.inference_result = True
-
-            if axioms == self.axioms:
-                self.inference_result = True
-                self.coq_script = coq_script
-                self.failure_log = failure_log
+            self.inference_result = True
+            self.coq_script = coq_script
+            self.failure_log = failure_log
             return True, failure_log
 
         failure_log = analyze_coq_output(output_lines)
@@ -235,14 +230,13 @@ class Theorem(object):
         self.variations.append(self)
 
         # contradiction (whole scope)
-        if self.inference_result is False:
-            neg_theorem = self.negate()
-            print('P -> not H')
-            neg_theorem.prove_simple()
-            if neg_theorem.inference_result:
-                self.inference_result = True
-                self.result2 = 'contradiction'
-                return
+        neg_theorem = self.negate()
+        print('P -> not H')
+        neg_theorem.prove_simple()
+        if neg_theorem.inference_result:
+            self.inference_result = True
+            self.result2 = 'contradiction'
+            return
 
         if abduction and self.doc is not None:
             print('abduction')
@@ -259,9 +253,31 @@ class Theorem(object):
             self.result2 = 'contradiction'
             return
 
-        print('readable subgoal')
+        print('creating readable subgoal')
         self.create_readable_subgoals()
+
+        print("P -> H with readable subgoal")
+        # self.skolemize()
         self.prove_debug(axioms=self.created_axioms)
+        logging.debug(self.coq_script)
+        logging.debug("\n".join(self.output_lines))
+        if self.inference_result:
+            print('proved by readable subgoal')
+            self.result2 = "entailment"
+            return
+
+        print('P -> not H with readable subgoal')
+        neg_theorem.prove_debug(axioms=self.created_axioms)
+        if neg_theorem.inference_result:
+            self.inference_result = True
+            self.result2 = 'contradiction'
+            print('proved by readable subgoal & negation')
+            return
+        print("not proved")
+        return
+
+    def skolemize(self):
+        breakpoint()
         return
 
     def create_readable_subgoals(self):

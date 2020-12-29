@@ -11,6 +11,7 @@ def test_prove_1(monkeypatch):
     theorem = main()
     axioms = theorem.readable_subgoals
     assert axioms[0] == 'The kids are boys'
+    assert theorem.result2 == "entailment"
     return
 
 
@@ -28,7 +29,7 @@ def test_prove_2(monkeypatch):
     return
 
 
-# good example our method solves
+@pytest.mark.skip("smile_e2")
 def test_prove_3(monkeypatch):
     monkeypatch.setattr('sys.argv', [
         'scripts/prove.py',
@@ -40,6 +41,7 @@ def test_prove_3(monkeypatch):
     assert axioms[2] == 'The boys are kids'
     assert axioms[0] == 'The man is with a smile'  # nice
     assert axioms[1] == 'The boys are near a man'  # nice
+    theorem.result2 == "entailment"
     return
 
 
@@ -83,7 +85,7 @@ def test_prove_26(monkeypatch):
     assert axioms[3] == 'The wheel is a motorbike'
     assert axioms[4] == 'The person is a man'
     assert axioms[2] == 'The person is doing tricks'
-    assert axioms[0] == 'The person is in a jacket'  # where di black go?
+    assert axioms[0] == 'The person is in a jacket'  # where did black go?
     return
 
 
@@ -141,27 +143,6 @@ def test_prove_47(monkeypatch):
     return
 
 
-def test_prove_55(monkeypatch):
-    """
-    Test if abduction is working
-    """
-    monkeypatch.setattr(
-        'sys.argv',
-        ['scripts/prove.py', 'data/parsed/pair_55.sem.xml', '--write'])
-    theorem = main()
-    axioms = theorem.readable_subgoals
-    assert not theorem.inference_result
-
-    monkeypatch.setattr('sys.argv', [
-        'scripts/prove.py', 'data/parsed/pair_55.sem.xml', '--write',
-        '--abduction', 'spsa'
-    ])
-    theorem = main()
-    axioms = theorem.readable_subgoals
-    assert theorem.inference_result
-    return
-
-
 def test_prove_90(monkeypatch):
     monkeypatch.setattr('sys.argv', [
         'scripts/prove.py',
@@ -171,6 +152,7 @@ def test_prove_90(monkeypatch):
     theorem = main()
     axioms = theorem.readable_subgoals
     assert axioms[0] == 'The pool is full'  # contradiction label
+    # assert theorem.result2 == "contradiction"
     return
 
 
@@ -181,6 +163,8 @@ def test_prove_100(monkeypatch):
     ])
     theorem = main()
     axioms = theorem.readable_subgoals
+    assert axioms[0] == 'The girls are doing backbends outdoors'
+    theorem.result2 == "entailment"
     return
 
 
@@ -344,6 +328,7 @@ def test_prove_10000(monkeypatch):
     return
 
 
+@pytest.mark.skip("race_e2")
 def test_prove_1010(monkeypatch):
     monkeypatch.setattr('sys.argv', [
         'scripts/prove.py',

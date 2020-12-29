@@ -1,27 +1,26 @@
+import pickle
 import csv
 from pathlib import Path
 import json
 
 
 def main():
+    filler = "------"
     data_dir = Path('data/created_axioms')
     result_path = Path('data/annotation_data.tsv')
     with result_path.open(mode='w') as f:
         writer = csv.writer(f, delimiter='\t', lineterminator='\n')
-        writer.writerow(['sentence', 'neutral', 'entailment', 'contradiction'])
+        writer.writerow(["category", 'sentence', "label"])
         for p in data_dir.iterdir():
             with p.open(mode='r') as f:
                 data = json.load(f)
             if data['readable_subgoals']:
-                writer.writerow([data['pair_id']])
-                premise = f"Premise: {' '.join(data['premise'])}"
-                writer.writerow([premise])
-                hypothesis = f"Conclusion: {' '.join(data['conclusion'])}"
-                writer.writerow([hypothesis])
-                writer.writerow(["Subgoals:"])
+                writer.writerow([data['pair_id'], filler, filler])
+                writer.writerow(["Situation", data['premise'], filler])
+                # writer.writerow(["Conslusion", data['conclusion']])
                 for r_goal in data['readable_subgoals']:
-                    writer.writerow([r_goal])
-                writer.writerow([])
+                    writer.writerow(["Is it true that: ", r_goal])
+                writer.writerow([filler, filler, filler, filler])
     return
 
 
