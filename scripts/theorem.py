@@ -22,6 +22,8 @@ import logging
 from lxml import etree
 import subprocess
 import re
+import json
+from pathlib import Path
 
 from coq_analyzer import analyze_coq_output, get_premise_lines, get_subgoals_from_coq_output2, get_conclusion_line
 from nltk2coq import normalize_interpretation
@@ -80,6 +82,7 @@ class Theorem(object):
         self.output_lines = []
         self.result2 = "neutral"
         self.error_message = None
+        self.use_readable_subgoal = None
 
     def __repr__(self):
         return self.coq_script
@@ -246,41 +249,41 @@ class Theorem(object):
                 self.result2 = 'entailment'
                 return
 
-        print("non_neg_theorem")
-        self.create_noneg_conclusion()
+        if self.use_readable_subgoal:
+            print("P -> H with readable subgoal")
+            created_axioms = self.get_readable_subgoals()
+            self.prove_debug(axioms=created_axioms)
+            logging.debug(self.coq_script)
+            logging.debug("\n".join(self.output_lines))
+            if self.inference_result:
+                print('proved by readable subgoal')
+                self.result2 = "entailment"
+                return
+
+            print('P -> not H with readable subgoal')
+            neg_theorem.prove_debug(axioms=created_axioms)
+            if neg_theorem.inference_result:
+                self.inference_result = True
+                self.result2 = 'contradiction'
+                print('proved by readable subgoal & negation')
+                return
+        print("not proved")
+        return
+
+    def get_readable_subgoals(self):
+        p = self.created_subgoal_path()
+        with p.open(mode="r") as f:
+            data = json.load(f)
+        return data["created_axioms"]
+
+    def create_readable_subgoals(self):
+
+        # Make noneg output
         self.prove_debug(use_noneg=True)
         if self.inference_result:
             self.result2 = 'contradiction'
             return
 
-        print('creating readable subgoal')
-        self.create_readable_subgoals()
-
-        print("P -> H with readable subgoal")
-        # self.skolemize()
-        self.prove_debug(axioms=self.created_axioms)
-        logging.debug(self.coq_script)
-        logging.debug("\n".join(self.output_lines))
-        if self.inference_result:
-            print('proved by readable subgoal')
-            self.result2 = "entailment"
-            return
-
-        print('P -> not H with readable subgoal')
-        neg_theorem.prove_debug(axioms=self.created_axioms)
-        if neg_theorem.inference_result:
-            self.inference_result = True
-            self.result2 = 'contradiction'
-            print('proved by readable subgoal & negation')
-            return
-        print("not proved")
-        return
-
-    def skolemize(self):
-        breakpoint()
-        return
-
-    def create_readable_subgoals(self):
         g = Graph(self)
 
         output_lines = self.output_lines
@@ -293,11 +296,28 @@ class Theorem(object):
 
         # graph.visualize()
         readable_subgoals, created_axioms = g.create_readable_subgoals()
-        self.readable_subgoals = readable_subgoals
-        self.created_axioms = created_axioms
-        self.premise_sentence = " ".join(g.premise)
-        self.hypothesis_sentence = " ".join(g.hypothesis)
+
+        # format results
+        result = {}
+        result["pair_id"] = self.id
+        result["premise"] = " ".join(g.premise)
+        result["conclusion"] = " ".join(g.hypothesis)
+        result["premise_formula"] = clean(self.premises[0])
+        result["conclusion_formula"] = clean(self.conclusion)
+        result["subgoals"] = self.subgoal
+        result["created_axioms"] = created_axioms
+        result["readable_subgoals"] = readable_subgoals
+        result["prediction"] = self.result2
+
+        # save
+        p = self.created_subgoal_path()
+        with p.open(mode="w") as f:
+            json.dump(result, f)
         return
+
+    def created_subgoal_path(self):
+        fn = self.sem.name.replace("xml", "json")
+        return Path(f"data/created_axioms/{fn}")
 
     def create_noneg_conclusion(self):
         neg_tree = get_negated_subtree(self.conclusion)
@@ -323,9 +343,6 @@ class Theorem(object):
                 output_lines = run_coq_script(coq_script, self.timeout)
 
                 theorem.subgoals = get_subgoal_lines(output_lines)
-        return
-
-    def flip_premise():
         return
 
     def to_xml(self):
@@ -611,7 +628,10 @@ class MasterTheorem(Theorem):
                       for s in semantics]
             theorem.labels = labels
             theorem.doc = doc
+            theorem.use_readable_subgoal = args.use_readable_subgoal
+            theorem.id = args.id
             theorem.timeout = timeout
+            theorem.sem = args.sem
             theorems.append(theorem)
         master_theorem = MasterTheorem(theorems)
         master_theorem.timeout = timeout

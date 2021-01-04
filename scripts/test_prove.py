@@ -343,6 +343,7 @@ def test_prove_1010(monkeypatch):
     return
 
 
+@pytest.mark.skip("racer -> sematic role")
 def test_prove_1016(monkeypatch):
     monkeypatch.setattr('sys.argv', [
         'scripts/prove.py',

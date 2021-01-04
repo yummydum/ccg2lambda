@@ -1,6 +1,18 @@
 prove:
 	python scripts/prove.py data/parsed/pair_${n}.sem.xml
 
+prove_save_rs:
+	python scripts/prove.py data/parsed/pair_${n}.sem.xml --save_readable_subgoal
+
+prove_save_rs_all:
+	python scripts/prove.py data/parsed --sick_all --save_readable_subgoal
+
+prove_use_rs:
+	python scripts/prove.py data/parsed/pair_${n}.sem.xml --use_readable_subgoal
+
+prove_use_rs_all:
+	python scripts/prove.py data/parsed --sick_all --use_readable_subgoal
+
 prove_abd:
 	python scripts/prove.py data/parsed/pair_${n}.sem.xml --abduction spsa
 

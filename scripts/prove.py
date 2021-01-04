@@ -17,7 +17,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import json
 import sys
 import argparse
 import codecs
@@ -28,7 +27,6 @@ from subprocess import TimeoutExpired
 from pathlib import Path
 from tqdm import tqdm
 from semantic_tools import prove_doc
-from theorem import clean
 
 logging.basicConfig(level=logging.WARNING)
 
@@ -44,6 +42,8 @@ def main():
     parser.add_argument("--sick_all", action="store_true")
     parser.add_argument("--split")
     parser.add_argument("--test_run", action='store_true')
+    parser.add_argument("--use_readable_subgoal", action='store_true')
+    parser.add_argument("--save_readable_subgoal", action='store_true')
     args = parser.parse_args()
     args.subgoals = True
 
@@ -92,7 +92,15 @@ def prove(args):
     args.id = int(args.sem.name.replace('.sem.xml', '').replace('pair_', ''))
 
     try:
+        fn = args.sem.name.replace("xml", "json")
+        p = Path(f"data/created_axioms/{fn}")
+        if args.save_readable_subgoal and p.exists():
+            print("already exists, skip")
+            return
+
         theorem = prove_doc(doc, args.abduction, args).theorems[0]
+        if args.save_readable_subgoal:
+            theorem.create_readable_subgoals()
     # TODO: see why timeout happens
     except TimeoutExpired:
         return
@@ -101,30 +109,8 @@ def prove(args):
     #     print(err)
     #     return
     except Exception as err:
-        # return
-        raise Exception(err)
-
-    if not theorem.created_axioms:
-        return theorem
-
-    result = {}
-    result["pair_id"] = args.id
-    result["premise"] = theorem.premise_sentence
-    result["conclusion"] = theorem.hypothesis_sentence
-    result["premise_formula"] = clean(theorem.premises[0])
-    result["conclusion_formula"] = clean(theorem.conclusion)
-    result["subgoals"] = theorem.subgoal
-    result["created_axioms"] = theorem.created_axioms
-    result["readable_subgoals"] = theorem.readable_subgoals
-    result["prediction"] = theorem.result2
-    fn = args.sem.name.replace("xml", "json")
-    if args.abduction is None:
-        ab_output = f"data/created_axioms/{fn}"
-    else:
-        ab_output = f"data/created_axioms_abduction/{fn}"
-    with codecs.open(ab_output, 'w', 'utf-8') as f:
-        json.dump(result, f)
-
+        return
+        # raise Exception(err)
     return theorem
 
 

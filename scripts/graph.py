@@ -269,7 +269,7 @@ class Graph:
         if len(premise_pred.args) == 1:
             antecedent = f"forall x, _{premise_pred.name} x"
         else:
-            antecedent = f"forall x, exists y, _{premise_pred.name} x y"
+            antecedent = f"forall x, forall y, _{premise_pred.name} x y"
         axiom = f"Axiom ax_{vp} : {antecedent} -> _{subgoal.name} x."
         return readable_sg, axiom
 
@@ -289,7 +289,7 @@ class Graph:
         copula = selectCopula(subj)
         det = selectDeterminer(arg_pred)
         readable_sg = f'The {subj.surf} {copula} {subgoal.surf}{det}{arg_pred.surf}'
-        axiom = f"Axiom ax_{subgoal.name} : forall x, exists y, exists z, _{subj.name} x -> _{subgoal.name} y z /\ _{arg_pred.name} z."
+        axiom = f"Axiom ax_{subgoal.name} : forall x, forall y, forall z, _{subj.name} x -> _{subgoal.name} y z /\ _{arg_pred.name} z."
         return readable_sg, axiom
 
     def from_tp_ununified(self, subgoal):
@@ -308,7 +308,7 @@ class Graph:
         copula = selectCopula(subj)
         det = selectDeterminer(arg_pred)
         readable_sg = f'The {subj.surf} {copula} {subgoal.surf}{det}{arg_pred.surf}'
-        axiom = f"Axiom ax_{subgoal.name}_{arg_pred.surf} : forall x, exists y, exists z, _{subj.name} x -> _{subgoal.name} y z /\ _{arg_pred.name} z."
+        axiom = f"Axiom ax_{subgoal.name}_{arg_pred.surf} : forall x, forall y, forall z, _{subj.name} x -> _{subgoal.name} y z /\ _{arg_pred.name} z."
         return readable_sg, axiom
 
     def from_sr(self, first, second):
